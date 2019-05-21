@@ -5,7 +5,7 @@
 
 import warnings
 warnings.simplefilter("ignore", category=ResourceWarning)
-
+import pandas as pd
 import numpy as np
 import SimpleITK as sitk
 from tensorpack import logger
@@ -26,6 +26,19 @@ def getLandmarksFromTXTFile(file):
         landmarks = np.asarray(landmarks).reshape((-1,3))
         return landmarks
 
+def getLandmarksFromFCSVFile(file):
+    df = pd.read_csv(
+        file,
+        header=None,
+        comment="#",
+        names=["fiducial_labels", "xcoord", "ycoord", "zcoord", "sel", "vis"],
+    )
+    # the sign flipping in x and y is to convert RAS(used by slicer) to LPS(used in DICOM and itk)
+    xcoord = -1 * df["xcoord"].values.reshape(-1, 1)
+    ycoord = -1 * df["ycoord"].values.reshape(-1, 1)
+    zcoord = df["zcoord"].values.reshape(-1, 1)
+    vec = np.concatenate((xcoord, ycoord, zcoord), axis=1).reshape(-1, 3)
+    return vec
 
 ###############################################################################
 
@@ -36,13 +49,14 @@ class filesListBrainMRLandmark(object):
         files_list: Two or on textfiles that contain a list of all images and (landmarks)
         returnLandmarks: Return landmarks if task is train or eval (default: True)
     """
-    def __init__(self, files_list=None, returnLandmarks=True):
+    def __init__(self, files_list=None, returnLandmarks=True, fiducial=0):
         # check if files_list exists
         assert files_list, 'There is no directory containing files list'
         # read image filenames
         self.image_files = [line.split('\n')[0] for line in open(files_list[0].name)]
         # read landmark filenames if task is train or eval
         self.returnLandmarks = returnLandmarks
+        self.fiducial = fiducial
         if self.returnLandmarks:
             self.landmark_files = [line.split('\n')[0] for line in open(files_list[1].name)]
             assert len(self.image_files)== len(self.landmark_files), 'number of image files is not equal to number of landmark files'
@@ -66,15 +80,18 @@ class filesListBrainMRLandmark(object):
                 if self.returnLandmarks:
                     ## transform landmarks to image space if they are in physical space
                     landmark_file = self.landmark_files[idx]
-                    all_landmarks = getLandmarksFromTXTFile(landmark_file)
-                    landmark = all_landmarks[14] # landmark index is 13 for ac-point and 14 pc-point
+                    if ".fcsv" in landmark_file:
+                        all_landmarks = getLandmarksFromFCSVFile(landmark_file)
+                    else:
+                        all_landmarks = getLandmarksFromTXTFile(landmark_file)
+                    landmark = all_landmarks[self.fiducial] # landmark index is 13 for ac-point and 14 pc-point
                     # transform landmark from physical to image space if required
                     # landmark = sitk_image.TransformPhysicalPointToContinuousIndex(landmark)
                     landmark = np.round(landmark).astype('int')
                 else:
                     landmark = None
                 # extract filename from path
-                image_filename = self.image_files[idx][:-7]
+                image_filename = self.image_files[idx]
                 yield image, landmark, image_filename, sitk_image.GetSpacing()
 
 ###############################################################################

@@ -51,7 +51,8 @@ MEMORY_SIZE = 1e5#6
 # consume at least 1e6 * 27 * 27 * 27 bytes
 INIT_MEMORY_SIZE = MEMORY_SIZE // 20 #5e4
 # each epoch is 100k played frames
-STEPS_PER_EPOCH = 10000 // UPDATE_FREQ * 10
+# STEPS_PER_EPOCH = 10000 // UPDATE_FREQ * 10
+STEPS_PER_EPOCH = 2500
 # num training epochs in between model evaluations
 EPOCHS_PER_EVAL = 2
 # the number of episodes to run during evaluation
@@ -242,7 +243,7 @@ if __name__ == '__main__':
                             pred, num_files)
         # run episodes in parallel and evaluate pretrained model
         elif args.task == 'eval':
-            play_n_episodes(get_player(files_list=args.files, viz=0.01,
+            play_n_episodes(get_player(files_list=args.files, viz=0,
                                        saveGif=args.saveGif,
                                        saveVideo=args.saveVideo,
                                        task='eval'),

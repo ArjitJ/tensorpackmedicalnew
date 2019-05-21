@@ -51,7 +51,7 @@ def play_one_episode(env, func, render=False):
             env.render()
         sum_r += r
         if isOver:
-            return sum_r, info['filename'], info['distError'], q_values
+            return sum_r, info['filename'], info['distError'], q_values, info['location']
 
 
 ###############################################################################
@@ -60,15 +60,19 @@ def play_n_episodes(player, predfunc, nr, render=False):
     """wraps play_one_episode, playing a single episode at a time and logs results
     used when playing demos."""
     logger.info("Start Playing ... ")
+    file = open('./results.txt', 'w')
     for k in range(nr):
         # if k != 0:
         #     player.restart_episode()
-        score, filename, ditance_error, q_values = play_one_episode(player,
+        score, filename, distance_error, q_values, location = play_one_episode(player,
                                                                     predfunc,
                                                                     render=render)
         logger.info(
-            "{}/{} - {} - score {} - distError {} - q_values {}".format(k + 1, nr, filename, score, ditance_error,
-                                                                        q_values))
+            "{}/{} - {} - score {} - distError {} - q_values {} - location {}".format(k + 1, nr, filename, score, distance_error,
+                                                                        q_values, location))
+        file.write("{} {}\n".format(filename, location))
+    file.close()
+
 
 
 ###############################################################################
@@ -99,7 +103,7 @@ def eval_with_funcs(predictors, nr_eval, get_player_fn, files_list=None):
                                        files_list=files_list)
                 while not self.stopped():
                     try:
-                        score, filename, ditance_error, q_values = play_one_episode(player, self.func)
+                        score, filename, ditance_error, q_values, location = play_one_episode(player, self.func)
                         # print("Score, ", score)
                     except RuntimeError:
                         return

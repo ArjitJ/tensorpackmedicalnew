@@ -436,7 +436,7 @@ class MedicalPlayer(gym.Env):
         self.current_episode_score.feed(self.reward)
 
         info = {'score': self.current_episode_score.sum, 'gameOver': self.terminal,
-                'distError': distance_error, 'filename': self.filename}
+                'distError': distance_error, 'filename': self.filename, 'location': self._location}
 
         # #######################################################################
         # ## generate evaluation results from 19 different points
@@ -464,8 +464,8 @@ class MedicalPlayer(gym.Env):
         last_qvalues_history = self._qvalues_history[-4:]
         last_loc_history = self._loc_history[-4:]
         best_qvalues = np.max(last_qvalues_history, axis=1)
-        # best_idx = best_qvalues.argmax()
-        best_idx = best_qvalues.argmin()
+        best_idx = best_qvalues.argmax()
+        # best_idx = best_qvalues.argmin()
         best_location = last_loc_history[best_idx]
 
         return best_location
