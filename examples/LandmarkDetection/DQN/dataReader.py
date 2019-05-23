@@ -8,6 +8,7 @@ warnings.simplefilter("ignore", category=ResourceWarning)
 import pandas as pd
 import numpy as np
 import SimpleITK as sitk
+import itk
 from tensorpack import logger
 from IPython.core.debugger import set_trace
 
@@ -86,7 +87,8 @@ class filesListBrainMRLandmark(object):
                         all_landmarks = getLandmarksFromTXTFile(landmark_file)
                     landmark = all_landmarks[self.fiducial] # landmark index is 13 for ac-point and 14 pc-point
                     # transform landmark from physical to image space if required
-                    # landmark = sitk_image.TransformPhysicalPointToContinuousIndex(landmark)
+                    if ".fcsv" in landmark_file:
+                        landmark = sitk_image.TransformPhysicalPointToContinuousIndex(landmark)
                     landmark = np.round(landmark).astype('int')
                 else:
                     landmark = None
@@ -133,6 +135,21 @@ class NiftiImage(object):
         else:
             sitk_image = sitk.ReadImage(image.name, sitk.sitkFloat32)
             np_image = sitk.GetArrayFromImage(sitk_image)
+            itk_image = itk.imread(image.name)
+            region = itk_image.GetLargestPossibleRegion()
+            index = np.array(region.GetIndex())
+            size = np.array(region.GetSize())
+            center = index + size / 2
+            center = sitk_image.TransformContinuousIndexToPhysicalPoint(center)
+            spacing = np.array(sitk_image.GetSpacing())
+            rif = sitk.ResampleImageFilter()
+            identity_transform = sitk.Transform(3, sitk.sitkIdentity)
+            rif.SetOutputSpacing(sitk_image.GetSpacing())
+            rif.SetTransform(identity_transform)
+            rif.SetOutputOrigin(tuple(np.array(center)) - spacing * size / 2)
+            rif.SetOutputDirection([1, 0, 0, 0, 1, 0, 0, 0, 1])
+            rif.SetSize(sitk_image.GetSize())
+            sitk_image = rif.Execute(sitk_image)
             # threshold image between p10 and p98 then re-scale [0-255]
             p0 = np_image.min().astype('float')
             p10 = np.percentile(np_image,10)
