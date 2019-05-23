@@ -32,12 +32,33 @@ def getLandmarksFromFCSVFile(file):
         file,
         header=None,
         comment="#",
-        names=["fiducial_labels", "xcoord", "ycoord", "zcoord", "sel", "vis"],
     )
+    if df.shape[1] == 6:
+        df.columns = ["label", "x", "y", "z", "sel", "vis"]
+
+    elif df.shape[1] == 14:
+        df.columns = [
+            "id",
+            "x",
+            "y",
+            "z",
+            "ow",
+            "ox",
+            "oy",
+            "oz",
+            "vis",
+            "sel",
+            "lock",
+            "label",
+            "desc",
+            "associatedNodeID",
+        ]
+    else:
+        raise "Please check your input FCSV file"
     # the sign flipping in x and y is to convert RAS(used by slicer) to LPS(used in DICOM and itk)
-    xcoord = -1 * df["xcoord"].values.reshape(-1, 1)
-    ycoord = -1 * df["ycoord"].values.reshape(-1, 1)
-    zcoord = df["zcoord"].values.reshape(-1, 1)
+    xcoord = -1 * df["x"].values.reshape(-1, 1)
+    ycoord = -1 * df["y"].values.reshape(-1, 1)
+    zcoord = df["z"].values.reshape(-1, 1)
     vec = np.concatenate((xcoord, ycoord, zcoord), axis=1).reshape(-1, 3)
     return vec
 
@@ -133,6 +154,10 @@ class NiftiImage(object):
         if label:
             sitk_image = sitk.ReadImage(image.name, sitk.sitkInt8)
         else:
+            output_size = (300, 300, 300)
+            output_spacing = (1, 1, 1)
+            offset = np.array(output_size) * np.array(output_spacing) / 2
+            identity_transform = sitk.Transform(3, sitk.sitkIdentity)
             sitk_image = sitk.ReadImage(image.name, sitk.sitkFloat32)
             np_image = sitk.GetArrayFromImage(sitk_image)
             itk_image = itk.imread(image.name)
@@ -141,14 +166,12 @@ class NiftiImage(object):
             size = np.array(region.GetSize())
             center = index + size / 2
             center = sitk_image.TransformContinuousIndexToPhysicalPoint(center)
-            spacing = np.array(sitk_image.GetSpacing())
             rif = sitk.ResampleImageFilter()
-            identity_transform = sitk.Transform(3, sitk.sitkIdentity)
-            rif.SetOutputSpacing(sitk_image.GetSpacing())
+            rif.SetOutputSpacing(output_spacing)
             rif.SetTransform(identity_transform)
-            rif.SetOutputOrigin(tuple(np.array(center)) - spacing * size / 2)
+            rif.SetOutputOrigin(tuple(np.array(center) - offset))
             rif.SetOutputDirection([1, 0, 0, 0, 1, 0, 0, 0, 1])
-            rif.SetSize(sitk_image.GetSize())
+            rif.SetSize(output_size)
             sitk_image = rif.Execute(sitk_image)
             # threshold image between p10 and p98 then re-scale [0-255]
             p0 = np_image.min().astype('float')
