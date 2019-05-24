@@ -130,8 +130,22 @@ class Model(DQNModel):
 
 
 ###############################################################################
+def get_initial_value(epoch):
+    schedule = [(0, 1), (10, 0.1), (320, 0.01)]
+    laste, lastv = None, None
+    for e, v in schedule:
+        if e == epoch:
+            return v
+        if e > epoch:
+            break
+        laste, lastv = e, v
+    if laste is None or laste == e:
+        return None
+    v = (epoch - laste) * 1. / (e - laste) * (v - lastv) + lastv
+    return v
 
-def get_config(files_list):
+
+def get_config(files_list, last):
     """This is only used during training."""
     expreplay = ExpReplay(
         predictor_io_names=(['state'], ['Qvalue']),
@@ -140,7 +154,7 @@ def get_config(files_list):
         batch_size=BATCH_SIZE,
         memory_size=MEMORY_SIZE,
         init_memory_size=INIT_MEMORY_SIZE,
-        init_exploration=1.0,
+        init_exploration=get_initial_value(int(last)),
         update_frequency=UPDATE_FREQ,
         history_len=FRAME_HISTORY
     )
@@ -203,7 +217,9 @@ if __name__ == '__main__':
                         default='train_log')
     parser.add_argument('--name', help='name of current experiment for logs',
                         default='experiment_1')
-
+    parser.add_argument('--lastEpoch', help='if loading a model, specify the last epoch you trained it on',
+                        default=0)
+    parser.add_argument('--fiducial', help='index of the fiducial', default=0)
 
     args = parser.parse_args()
 
@@ -223,7 +239,7 @@ if __name__ == '__main__':
     # load files into env to set num_actions, num_validation_files
     init_player = MedicalPlayer(files_list=args.files,
                                 screen_dims=IMAGE_SIZE,
-                                task='play')
+                                task='play', fiducial=int(args.fiducial))
     NUM_ACTIONS = init_player.action_space.n
     num_files = init_player.files.num_files
 
@@ -251,7 +267,7 @@ if __name__ == '__main__':
     else:  # train model
         logger_dir = os.path.join(args.logDir, args.name)
         logger.set_logger_dir(logger_dir)
-        config = get_config(args.files)
+        config = get_config(args.files, args.lastEpoch)
         if args.load:  # resume training from a saved checkpoint
             config.session_init = get_model_loader(args.load)
         launch_train_with_config(config, SimpleTrainer())
