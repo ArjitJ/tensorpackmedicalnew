@@ -7,6 +7,7 @@ import warnings
 warnings.simplefilter("ignore", category=ResourceWarning)
 import pandas as pd
 import numpy as np
+import os
 import SimpleITK as sitk
 import itk
 from tensorpack import logger
@@ -14,6 +15,8 @@ from IPython.core.debugger import set_trace
 
 __all__ = ['filesListBrainMRLandmark','NiftiImage']
 
+if not os.path.isdir('../inference'):
+    os.mkdir('../inference')
 ######################################################################
 ## extract points from txt file
 def getLandmarksFromTXTFile(file):
@@ -71,7 +74,7 @@ class filesListBrainMRLandmark(object):
         files_list: Two or on textfiles that contain a list of all images and (landmarks)
         returnLandmarks: Return landmarks if task is train or eval (default: True)
     """
-    def __init__(self, files_list=None, returnLandmarks=True, fiducial=0):
+    def __init__(self, files_list=None, returnLandmarks=True, fiducial=0, eval=False):
         # check if files_list exists
         assert files_list, 'There is no directory containing files list'
         # read image filenames
@@ -79,6 +82,7 @@ class filesListBrainMRLandmark(object):
         # read landmark filenames if task is train or eval
         self.returnLandmarks = returnLandmarks
         self.fiducial = fiducial
+        self.eval = eval
         if self.returnLandmarks:
             self.landmark_files = [line.split('\n')[0] for line in open(files_list[1].name)]
             assert len(self.image_files)== len(self.landmark_files), 'number of image files is not equal to number of landmark files'
@@ -111,6 +115,9 @@ class filesListBrainMRLandmark(object):
                     if ".fcsv" in landmark_file:
                         landmark = sitk_image.TransformPhysicalPointToContinuousIndex(landmark)
                     landmark = np.round(landmark).astype('int')
+                    # landmark = landmark[[2, 1, 0]].reshape(landmark.shape)
+                    if eval:
+                        sitk.WriteImage(sitk_image, '../inference/'+os.path.basename(image.name))
                 else:
                     landmark = None
                 # extract filename from path
@@ -190,7 +197,6 @@ class NiftiImage(object):
             sitk_image = sitk.RescaleIntensity(sitk_image,
                                                outputMinimum=0,
                                                outputMaximum=255)
-
         # Convert from [depth, width, height] to [width, height, depth]
         image.data = sitk.GetArrayFromImage(sitk_image).transpose(2,1,0)#.astype('uint8')
         image.dims = np.shape(image.data)

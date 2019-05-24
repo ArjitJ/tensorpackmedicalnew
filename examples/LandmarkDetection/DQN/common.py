@@ -5,13 +5,14 @@
 # Modified: Amir Alansary <amiralansary@gmail.com>
 
 import random
+import os
 import time
 import threading
 import numpy as np
 from tqdm import tqdm
 import multiprocessing
 from six.moves import queue
-
+import SimpleITK as sitk
 # from tensorpack import *
 # from tensorpack.utils.stats import *
 from tensorpack.utils import logger
@@ -23,8 +24,10 @@ from tensorpack.utils.concurrency import (StoppableThread, ShareSessionThread)
 
 import traceback
 
-
+if not os.path.isdir('../inference'):
+    os.mkdir('../inference')
 ###############################################################################
+
 
 def play_one_episode(env, func, render=False):
     def predict(s):
@@ -61,6 +64,7 @@ def play_n_episodes(player, predfunc, nr, render=False):
     used when playing demos."""
     logger.info("Start Playing ... ")
     file = open('./results.txt', 'w')
+    errors = open('./errors.txt', 'w')
     for k in range(nr):
         # if k != 0:
         #     player.restart_episode()
@@ -71,6 +75,12 @@ def play_n_episodes(player, predfunc, nr, render=False):
             "{}/{} - {} - score {} - distError {} - q_values {} - location {}".format(k + 1, nr, filename, score, distance_error,
                                                                         q_values, location))
         file.write("{} {}\n".format(filename, location))
+        errors.write('{}\n'.format(distance_error))
+        img = sitk.ReadImage('../inference/'+os.path.basename(filename))
+        physical = img.TransformContinuousIndexToPhysicalPoint((location[2], location[1], location[0]))
+        fcsv = open('../inference/'+os.path.basename(filename[:-10]+'lmks.fcsv'), 'w')
+        fcsv.write('AC,{},{},{},1,1\n'.format(-physical[0], -physical[1], physical[2]))
+        fcsv.close()
     file.close()
 
 
