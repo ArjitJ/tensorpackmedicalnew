@@ -157,9 +157,14 @@ class MedicalPlayer(gym.Env):
             self.files = filesListBrainMRLandmark(files_list,
                                                   returnLandmarks=False, fiducial=fiducial)
         else:
-            self.files = filesListBrainMRLandmark(files_list,
-                                                  returnLandmarks=True, fiducial=fiducial, eval=(self.task=='eval'))
-
+            if self.task == 'eval':
+                self.files = filesListBrainMRLandmark(files_list,
+                                                      returnLandmarks=True, fiducial=fiducial,
+                                                      eval=True)
+            else:
+                self.files = filesListBrainMRLandmark(files_list,
+                                                      returnLandmarks=True, fiducial=fiducial,
+                                                      eval=False)
 
         # prepare file sampler
         self.filepath = None

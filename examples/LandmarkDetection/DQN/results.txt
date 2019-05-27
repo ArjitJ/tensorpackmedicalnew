@@ -1,3 +1,0 @@
-/Shared/sinapse/20190521_LandmarkIdentification/PHDBIDS/sub-121799/ses-98610/anat/sub-121799_ses-98610_run-004_echo-0_T1w.nii.gz (152, 146, 150)
-/Shared/sinapse/20190521_LandmarkIdentification/PHDBIDS/sub-121799/ses-85267/anat/sub-121799_ses-85267_run-003_echo-0_T1w.nii.gz (152, 146, 150)
-/Shared/sinapse/20190521_LandmarkIdentification/PHDBIDS/sub-121799/ses-98610/anat/sub-121799_ses-98610_run-003_echo-0_T1w.nii.gz (152, 144, 157)

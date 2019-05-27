@@ -52,7 +52,7 @@ MEMORY_SIZE = 1e5#6
 INIT_MEMORY_SIZE = MEMORY_SIZE // 20 #5e4
 # each epoch is 100k played frames
 # STEPS_PER_EPOCH = 10000 // UPDATE_FREQ * 10
-STEPS_PER_EPOCH = 50
+STEPS_PER_EPOCH = 4604
 # num training epochs in between model evaluations
 EPOCHS_PER_EVAL = 1
 # the number of episodes to run during evaluation
@@ -61,11 +61,11 @@ EVAL_EPISODE = 50
 ###############################################################################
 
 def get_player(directory=None, files_list= None, viz=False,
-               task='play', saveGif=False, saveVideo=False):
+               task='play', saveGif=False, saveVideo=False, fiducial=0):
     # in atari paper, max_num_frames = 30000
     env = MedicalPlayer(directory=directory, screen_dims=IMAGE_SIZE,
                         viz=viz, saveGif=saveGif, saveVideo=saveVideo,
-                        task=task, files_list=files_list, max_num_frames=1500)
+                        task=task, files_list=files_list, max_num_frames=1500, fiducial=fiducial)
     if (task != 'train'):
         # in training, env will be decorated by ExpReplay, and history
         # is taken care of in expreplay buffer
@@ -73,6 +73,8 @@ def get_player(directory=None, files_list= None, viz=False,
         env = FrameStack(env, FRAME_HISTORY)
     return env
 
+def get_player_fn(*myargs, **kwargs):
+    return get_player(fiducial=args.fiducial, *myargs, **kwargs)
 ###############################################################################
 
 class Model(DQNModel):
@@ -145,16 +147,16 @@ def get_initial_value(epoch):
     return v
 
 
-def get_config(files_list, last):
+def get_config(files_list, last, fiducial=0):
     """This is only used during training."""
     expreplay = ExpReplay(
         predictor_io_names=(['state'], ['Qvalue']),
-        player=get_player(task='train', files_list=files_list),
+        player=get_player(task='train', files_list=files_list, fiducial=fiducial),
         state_shape=IMAGE_SIZE,
         batch_size=BATCH_SIZE,
         memory_size=MEMORY_SIZE,
         init_memory_size=INIT_MEMORY_SIZE,
-        init_exploration=get_initial_value(int(last)),
+        init_exploration=get_initial_value(last),
         update_frequency=UPDATE_FREQ,
         history_len=FRAME_HISTORY
     )
@@ -180,7 +182,7 @@ def get_config(files_list, last):
             PeriodicTrigger(
                 Evaluator(nr_eval=EVAL_EPISODE, input_names=['state'],
                           output_names=['Qvalue'], files_list=files_list,
-                          get_player_fn=get_player),
+                          get_player_fn=get_player_fn),
                 every_k_epochs=EPOCHS_PER_EVAL),
             HumanHyperParamSetter('learning_rate'),
         ],
@@ -217,9 +219,11 @@ if __name__ == '__main__':
                         default='train_log')
     parser.add_argument('--name', help='name of current experiment for logs',
                         default='experiment_1')
-    parser.add_argument('--lastEpoch', help='if loading a model, specify the last epoch you trained it on',
+    parser.add_argument('--lastEpoch', type=int, help='if loading a model, specify the last epoch you trained it on',
                         default=0)
-    parser.add_argument('--fiducial', help='index of the fiducial', default=0)
+    parser.add_argument('--fiducial', type=int, help='index of the fiducial', default=0)
+    parser.add_argument('--fidName', help='name of the fiducial', default='fiducial_name')
+    parser.add_argument('--inferDir', help='directory to save the inferences', default='../inference')
 
     args = parser.parse_args()
 
@@ -239,7 +243,7 @@ if __name__ == '__main__':
     # load files into env to set num_actions, num_validation_files
     init_player = MedicalPlayer(files_list=args.files,
                                 screen_dims=IMAGE_SIZE,
-                                task='play', fiducial=int(args.fiducial))
+                                task='play', fiducial=args.fiducial)
     NUM_ACTIONS = init_player.action_space.n
     num_files = init_player.files.num_files
 
@@ -255,19 +259,19 @@ if __name__ == '__main__':
             play_n_episodes(get_player(files_list=args.files, viz=0.01,
                                        saveGif=args.saveGif,
                                        saveVideo=args.saveVideo,
-                                       task='play'),
-                            pred, num_files)
+                                       task='play', fiducial=args.fiducial),
+                            pred, num_files, fidname=args.fidName)
         # run episodes in parallel and evaluate pretrained model
         elif args.task == 'eval':
             play_n_episodes(get_player(files_list=args.files, viz=0.01,
                                        saveGif=args.saveGif,
                                        saveVideo=args.saveVideo,
-                                       task='eval'),
-                            pred, num_files)
+                                       task='eval', fiducial=args.fiducial),
+                            pred, num_files, fidname=args.fidName)
     else:  # train model
         logger_dir = os.path.join(args.logDir, args.name)
         logger.set_logger_dir(logger_dir)
-        config = get_config(args.files, args.lastEpoch)
+        config = get_config(args.files, args.lastEpoch, args.fiducial)
         if args.load:  # resume training from a saved checkpoint
             config.session_init = get_model_loader(args.load)
         launch_train_with_config(config, SimpleTrainer())

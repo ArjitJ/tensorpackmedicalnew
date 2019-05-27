@@ -222,7 +222,6 @@ class ExpReplay(DataFlow, Callback):
                 q_values = self.predictor(history[None, :, :, :])[0][0]
 
             act = np.argmax(q_values)
-
         self._current_ob, reward, isOver, info = self.player.step(act, q_values)
 
         if isOver:

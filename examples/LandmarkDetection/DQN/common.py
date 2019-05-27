@@ -24,8 +24,7 @@ from tensorpack.utils.concurrency import (StoppableThread, ShareSessionThread)
 
 import traceback
 
-if not os.path.isdir('../inference'):
-    os.mkdir('../inference')
+
 ###############################################################################
 
 
@@ -59,12 +58,16 @@ def play_one_episode(env, func, render=False):
 
 ###############################################################################
 
-def play_n_episodes(player, predfunc, nr, render=False):
+def play_n_episodes(player, predfunc, nr, render=False, fidname='fiducial_name', infDir='../inference'):
     """wraps play_one_episode, playing a single episode at a time and logs results
     used when playing demos."""
+    if infDir[-1] == '/':
+        infDir = infDir[:-1]
+    if not os.path.isdir(infDir):
+        os.mkdir(infDir)
     logger.info("Start Playing ... ")
-    file = open('./results.txt', 'w')
-    errors = open('./errors.txt', 'w')
+    # file = open('./results.txt', 'w')
+    # errors = open('./errors.txt', 'w')
     for k in range(nr):
         # if k != 0:
         #     player.restart_episode()
@@ -74,14 +77,15 @@ def play_n_episodes(player, predfunc, nr, render=False):
         logger.info(
             "{}/{} - {} - score {} - distError {} - q_values {} - location {}".format(k + 1, nr, filename, score, distance_error,
                                                                         q_values, location))
-        file.write("{} {}\n".format(filename, location))
-        errors.write('{}\n'.format(distance_error))
-        img = sitk.ReadImage('../inference/'+os.path.basename(filename))
-        physical = img.TransformContinuousIndexToPhysicalPoint((location[2], location[1], location[0]))
-        fcsv = open('../inference/'+os.path.basename(filename[:-10]+'lmks.fcsv'), 'w')
-        fcsv.write('AC,{},{},{},1,1\n'.format(-physical[0], -physical[1], physical[2]))
+        # file.write("{} {}\n".format(filename, location))
+        # errors.write('{}\n'.format(distance_error))
+        img = sitk.ReadImage(infDir+'/'+os.path.basename(filename))
+        # physical = img.TransformContinuousIndexToPhysicalPoint((location[0], location[1], location[2]))
+        physical = img.TransformContinuousIndexToPhysicalPoint((location[0], location[1], location[2]))
+        fcsv = open(infDir+'/'+os.path.basename(filename[:-10]+'lmks.fcsv'), 'w')
+        fcsv.write('{},{},{},{},1,1\n'.format(fidname, -physical[0], -physical[1], physical[2]))
         fcsv.close()
-    file.close()
+    # file.close()
 
 
 
