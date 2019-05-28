@@ -13,14 +13,16 @@ from tqdm import tqdm
 import multiprocessing
 from six.moves import queue
 import SimpleITK as sitk
+
 # from tensorpack import *
 # from tensorpack.utils.stats import *
 from tensorpack.utils import logger
+
 # from tensorpack.callbacks import Triggerable
 from tensorpack.callbacks.base import Callback
 from tensorpack.utils.stats import StatCounter
 from tensorpack.utils.utils import get_tqdm_kwargs
-from tensorpack.utils.concurrency import (StoppableThread, ShareSessionThread)
+from tensorpack.utils.concurrency import StoppableThread, ShareSessionThread
 
 import traceback
 
@@ -53,15 +55,24 @@ def play_one_episode(env, func, render=False):
             env.render()
         sum_r += r
         if isOver:
-            return sum_r, info['filename'], info['distError'], q_values, info['location']
+            return (
+                sum_r,
+                info["filename"],
+                info["distError"],
+                q_values,
+                info["location"],
+            )
 
 
 ###############################################################################
 
-def play_n_episodes(player, predfunc, nr, render=False, fidname='fiducial_name', infDir='../inference'):
+
+def play_n_episodes(
+    player, predfunc, nr, render=False, fidname="fiducial_name", infDir="../inference"
+):
     """wraps play_one_episode, playing a single episode at a time and logs results
     used when playing demos."""
-    if infDir[-1] == '/':
+    if infDir[-1] == "/":
         infDir = infDir[:-1]
     if not os.path.isdir(infDir):
         os.mkdir(infDir)
@@ -71,25 +82,40 @@ def play_n_episodes(player, predfunc, nr, render=False, fidname='fiducial_name',
     for k in range(nr):
         # if k != 0:
         #     player.restart_episode()
-        score, filename, distance_error, q_values, location = play_one_episode(player,
-                                                                    predfunc,
-                                                                    render=render)
+        score, filename, distance_error, q_values, location = play_one_episode(
+            player, predfunc, render=render
+        )
         logger.info(
-            "{}/{} - {} - score {} - distError {} - q_values {} - location {}".format(k + 1, nr, filename, score, distance_error,
-                                                                        q_values, location))
+            "{}/{} - {} - score {} - distError {} - q_values {} - location {}".format(
+                k + 1, nr, filename, score, distance_error, q_values, location
+            )
+        )
         # file.write("{} {}\n".format(filename, location))
         # errors.write('{}\n'.format(distance_error))
-        img = sitk.ReadImage(infDir+'/'+os.path.basename(filename))
+        img = sitk.ReadImage(infDir + "/" + os.path.basename(filename))
         # physical = img.TransformContinuousIndexToPhysicalPoint((location[0], location[1], location[2]))
-        physical = img.TransformContinuousIndexToPhysicalPoint((location[0], location[1], location[2]))
-        fcsv = open(infDir+'/'+os.path.basename(filename[:-10]+'lmks.fcsv'), 'w')
-        fcsv.write('{},{},{},{},1,1\n'.format(fidname, -physical[0], -physical[1], physical[2]))
+        physical = img.TransformContinuousIndexToPhysicalPoint(
+            (location[0], location[1], location[2])
+        )
+        fcsv = open(infDir + "/" + os.path.basename(filename[:-10] + "lmks.fcsv"), "w")
+        fcsv_new = open(
+            infDir + "/" + os.path.basename(filename[:-10] + "lmks_new.fcsv"), "w"
+        )
+        fcsv.write(
+            "{},{},{},{},1,1\n".format(fidname, -physical[0], -physical[1], physical[2])
+        )
+        fcsv_new.write(
+            "vtkMRMLMarkupsFiducialNode_0, {}, {}, {}, 0, 0, 0, 1, 1, 1, 0, {}, ,\n".format(
+                -physical[0], -physical[1], physical[2], fidname
+            )
+        )
         fcsv.close()
+        fcsv_new.close()
     # file.close()
 
 
-
 ###############################################################################
+
 
 def eval_with_funcs(predictors, nr_eval, get_player_fn, files_list=None):
     """
@@ -113,11 +139,12 @@ def eval_with_funcs(predictors, nr_eval, get_player_fn, files_list=None):
 
         def run(self):
             with self.default_sess():
-                player = get_player_fn(task=False,
-                                       files_list=files_list)
+                player = get_player_fn(task=False, files_list=files_list)
                 while not self.stopped():
                     try:
-                        score, filename, ditance_error, q_values, location = play_one_episode(player, self.func)
+                        score, filename, ditance_error, q_values, location = play_one_episode(
+                            player, self.func
+                        )
                         # print("Score, ", score)
                     except RuntimeError:
                         return
@@ -163,6 +190,7 @@ def eval_with_funcs(predictors, nr_eval, get_player_fn, files_list=None):
 
 ###############################################################################
 
+
 def eval_model_multithread(pred, nr_eval, get_player_fn, files_list):
     """
     Args:
@@ -173,15 +201,22 @@ def eval_model_multithread(pred, nr_eval, get_player_fn, files_list):
     NR_PROC = min(multiprocessing.cpu_count() // 2, 8)
     with pred.sess.as_default():
         mean_score, max_score, mean_dist, max_dist = eval_with_funcs(
-            [pred] * NR_PROC, nr_eval, get_player_fn, files_list)
-    logger.info("Average Score: {}; Max Score: {}; Average Distance: {}; Max Distance: {}".format(mean_score, max_score, mean_dist, max_dist))
+            [pred] * NR_PROC, nr_eval, get_player_fn, files_list
+        )
+    logger.info(
+        "Average Score: {}; Max Score: {}; Average Distance: {}; Max Distance: {}".format(
+            mean_score, max_score, mean_dist, max_dist
+        )
+    )
+
 
 ###############################################################################
 
-class Evaluator(Callback):
 
-    def __init__(self, nr_eval, input_names, output_names,
-                 get_player_fn, files_list=None):
+class Evaluator(Callback):
+    def __init__(
+        self, nr_eval, input_names, output_names, get_player_fn, files_list=None
+    ):
         self.files_list = files_list
         self.eval_episode = nr_eval
         self.input_names = input_names
@@ -190,22 +225,25 @@ class Evaluator(Callback):
 
     def _setup_graph(self):
         NR_PROC = min(multiprocessing.cpu_count() // 2, 20)
-        self.pred_funcs = [self.trainer.get_predictor(
-            self.input_names, self.output_names)] * NR_PROC
+        self.pred_funcs = [
+            self.trainer.get_predictor(self.input_names, self.output_names)
+        ] * NR_PROC
 
     def _trigger(self):
         """triggered by Trainer"""
         t = time.time()
         mean_score, max_score, mean_dist, max_dist = eval_with_funcs(
-            self.pred_funcs, self.eval_episode, self.get_player_fn, self.files_list)
+            self.pred_funcs, self.eval_episode, self.get_player_fn, self.files_list
+        )
         t = time.time() - t
         if t > 10 * 60:  # eval takes too long
             self.eval_episode = int(self.eval_episode * 0.94)
 
         # log scores
-        self.trainer.monitors.put_scalar('mean_score', mean_score)
-        self.trainer.monitors.put_scalar('max_score', max_score)
-        self.trainer.monitors.put_scalar('mean_distance', mean_dist)
-        self.trainer.monitors.put_scalar('max_distance', max_dist)
+        self.trainer.monitors.put_scalar("mean_score", mean_score)
+        self.trainer.monitors.put_scalar("max_score", max_score)
+        self.trainer.monitors.put_scalar("mean_distance", mean_dist)
+        self.trainer.monitors.put_scalar("max_distance", max_dist)
+
 
 ###############################################################################

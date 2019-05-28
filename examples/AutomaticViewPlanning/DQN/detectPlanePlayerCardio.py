@@ -11,7 +11,7 @@ import random
 import threading
 import numpy as np
 from tensorpack import logger
-from collections import (Counter, defaultdict, deque, namedtuple)
+from collections import Counter, defaultdict, deque, namedtuple
 
 from collections import deque
 import copy
@@ -39,22 +39,25 @@ from sampleTrain import *
 from detectPlaneHelper import *
 
 
-__all__ = ['MedicalPlayer']
+__all__ = ["MedicalPlayer"]
 
 _ALE_LOCK = threading.Lock()
 
 
 # plane container of its array, normal vector, origin,
 # and parameters(angles in degrees and d), selected points (e.g. corners)
-Plane = namedtuple('Plane', ['grid', 'grid_smooth', 'norm', 'origin', 'params',
-                            'points'])
+Plane = namedtuple(
+    "Plane", ["grid", "grid_smooth", "norm", "origin", "params", "points"]
+)
 
 # ===================================================================
 # =================== 3d medical environment ========================
 # ===================================================================
 
 from IPython.core.debugger import set_trace
+
 # set_trace()
+
 
 class MedicalPlayer(gym.Env):
     """Class that provides 3D medical image environment.
@@ -62,10 +65,20 @@ class MedicalPlayer(gym.Env):
     Each time-step, the agent chooses an action, and the environment returns
     an observation and a reward."""
 
-    def __init__(self, directory=None, files_list=None, viz=False, train=False,
-                 screen_dims=(27,27,27), spacing=(1,1,1), nullop_start=30,
-                 history_length=30, max_num_frames=0, saveGif=False,
-                 saveVideo=False):
+    def __init__(
+        self,
+        directory=None,
+        files_list=None,
+        viz=False,
+        train=False,
+        screen_dims=(27, 27, 27),
+        spacing=(1, 1, 1),
+        nullop_start=30,
+        history_length=30,
+        max_num_frames=0,
+        saveGif=False,
+        saveVideo=False,
+    ):
         """
         :param train_directory: environment or game name
         :param viz: visualization
@@ -87,16 +100,16 @@ class MedicalPlayer(gym.Env):
 
         #######################################################################
         ## save results in csv file
-        self.csvfile = 'dummy.csv'
+        self.csvfile = "dummy.csv"
         if not train:
-            with open(self.csvfile, 'w') as outcsv:
+            with open(self.csvfile, "w") as outcsv:
                 fields = ["filename", "dist_error", "angle_error"]
                 writer = csv.writer(outcsv)
                 writer.writerow(map(lambda x: x, fields))
         #######################################################################
 
         # read files from directory - add your data loader here
-        self.files = filesListCardioMRPlane(directory,files_list)
+        self.files = filesListCardioMRPlane(directory, files_list)
 
         # prepare file sampler
         self.sampled_files = self.files.sample_circular()
@@ -123,10 +136,9 @@ class MedicalPlayer(gym.Env):
         # stat counter to store current score or accumlated reward
         self.current_episode_score = StatCounter()
         # get action space and minimal action set
-        self.action_space = spaces.Discrete(8) # change number actions here
+        self.action_space = spaces.Discrete(8)  # change number actions here
         self.actions = self.action_space.n
-        self.observation_space = spaces.Box(low=0, high=255,
-                                            shape=self.screen_dims)
+        self.observation_space = spaces.Box(low=0, high=255, shape=self.screen_dims)
         # history buffer for storing last locations to check oscillations
         self._history_length = history_length
         # circular buffer to store plane parameters history [4,history_length]
@@ -138,12 +150,12 @@ class MedicalPlayer(gym.Env):
         # self._loc_history = [(0,) * self.dims] * self._history_length
         self._loc_history = [(0,) * 4] * self._history_length
         self._qvalues_history = [(0,) * self.actions] * self._history_length
-        self._qvalues = [0,] * self.actions
+        self._qvalues = [0] * self.actions
 
         with _ALE_LOCK:
             self.rng = get_rng(self)
             # visualization setup
-            if isinstance(viz, six.string_types):   # check if viz is a string
+            if isinstance(viz, six.string_types):  # check if viz is a string
                 assert os.path.isdir(viz), viz
                 viz = 0
             if isinstance(viz, int):
@@ -167,7 +179,7 @@ class MedicalPlayer(gym.Env):
         restart current episoide
         """
         self.terminal = False
-        self.cnt = 0 # counter to limit number of steps per episodes
+        self.cnt = 0  # counter to limit number of steps per episodes
         self.num_games.feed(1)
         self.current_episode_score.reset()  # reset score stat counter
         self._plane_history.clear()
@@ -189,8 +201,13 @@ class MedicalPlayer(gym.Env):
         self.viewer = None
 
         # sample a new image
-        (self.sitk_image, self.sitk_image_2ch, self.sitk_image_4ch,
-         self.landmarks, self.filepath) = next(self.sampled_files)
+        (
+            self.sitk_image,
+            self.sitk_image_2ch,
+            self.sitk_image_4ch,
+            self.landmarks,
+            self.filepath,
+        ) = next(self.sampled_files)
         self.filename = os.path.basename(self.filepath)
         # image volume size
         self._image_dims = self.sitk_image.GetSize()
@@ -198,59 +215,86 @@ class MedicalPlayer(gym.Env):
         self.action_dist_step = copy.deepcopy(self._init_action_dist_step)
         self.spacing = self.init_spacing.copy()
 
-
         # find center point of the initial plane
         if self.train:
             # sample randomly ±10% around the center point
-            skip_thickness = ((int)(self._image_dims[0]/2.5),
-                              (int)(self._image_dims[1]/2.5),
-                              (int)(self._image_dims[2]/2.5))
-            x = self.rng.randint(0+skip_thickness[0],
-                             self._image_dims[0]-skip_thickness[0])
-            y = self.rng.randint(0+skip_thickness[1],
-                             self._image_dims[1]-skip_thickness[1])
-            z = self.rng.randint(0+skip_thickness[2],
-                             self._image_dims[2]-skip_thickness[2])
+            skip_thickness = (
+                (int)(self._image_dims[0] / 2.5),
+                (int)(self._image_dims[1] / 2.5),
+                (int)(self._image_dims[2] / 2.5),
+            )
+            x = self.rng.randint(
+                0 + skip_thickness[0], self._image_dims[0] - skip_thickness[0]
+            )
+            y = self.rng.randint(
+                0 + skip_thickness[1], self._image_dims[1] - skip_thickness[1]
+            )
+            z = self.rng.randint(
+                0 + skip_thickness[2], self._image_dims[2] - skip_thickness[2]
+            )
         else:
             # during testing start sample a plane around the center point
-            x,y,z = (self._image_dims[0]/2,
-                     self._image_dims[1]/2,
-                     self._image_dims[2]/2)
+            x, y, z = (
+                self._image_dims[0] / 2,
+                self._image_dims[1] / 2,
+                self._image_dims[2] / 2,
+            )
         self._origin3d_point = (int(x), int(y), int(z))
         # Get ground truth plane
         # logger.info('filename {} '.format(self.filename))
-        self._groundTruth_plane = Plane(*getGroundTruthPlane(
-                                            self.sitk_image,
-                                            self.sitk_image_4ch,
-                                            self._origin3d_point,
-                                            self._plane_size,
-                                            spacing=self.spacing))
+        self._groundTruth_plane = Plane(
+            *getGroundTruthPlane(
+                self.sitk_image,
+                self.sitk_image_4ch,
+                self._origin3d_point,
+                self._plane_size,
+                spacing=self.spacing,
+            )
+        )
         # get an istropic 1mm groundtruth plane
         # image_size = (int(min(self._image_dims)),)*3
         image_size = self._image_dims
-        self.groundTruth_plane_iso = Plane(*getGroundTruthPlane(
-                                                self.sitk_image,
-                                                self.sitk_image_4ch,
-                                                self._origin3d_point,
-                                                image_size, [1,1,1]))
+        self.groundTruth_plane_iso = Plane(
+            *getGroundTruthPlane(
+                self.sitk_image,
+                self.sitk_image_4ch,
+                self._origin3d_point,
+                image_size,
+                [1, 1, 1],
+            )
+        )
 
-        self.landmarks_gt, _ = zip(*[projectPointOnPlane(point, self._groundTruth_plane.norm, self._groundTruth_plane.origin) for point in self.landmarks])
+        self.landmarks_gt, _ = zip(
+            *[
+                projectPointOnPlane(
+                    point, self._groundTruth_plane.norm, self._groundTruth_plane.origin
+                )
+                for point in self.landmarks
+            ]
+        )
         # logger.info('groundTruth {}'.format(self._groundTruth_plane.params))
         # Get initial plane and set current plane the same
-        self._plane = self._init_plane = Plane(*getInitialPlane(
-                                            self.sitk_image,
-                                            self._plane_size,
-                                            self._origin3d_point,
-                                            self.spacing))
-        _, dist = zip(*[projectPointOnPlane(point, self._plane.norm, self._plane.origin) for point in self.landmarks_gt])
+        self._plane = self._init_plane = Plane(
+            *getInitialPlane(
+                self.sitk_image, self._plane_size, self._origin3d_point, self.spacing
+            )
+        )
+        _, dist = zip(
+            *[
+                projectPointOnPlane(point, self._plane.norm, self._plane.origin)
+                for point in self.landmarks_gt
+            ]
+        )
         # calculate current distance between initial and ground truth planes
         # self.cur_dist = calcMeanDistTwoPlanes(self._groundTruth_plane.points,
         #                                      self._plane.points)
         self.cur_dist = np.mean(np.abs(dist))
-        self.cur_dist_params = calcDistTwoParams(self._groundTruth_plane.params
-                                        , self._plane.params,
-                                        scale_angle = self.action_angle_step,
-                                        scale_dist = self.action_dist_step)
+        self.cur_dist_params = calcDistTwoParams(
+            self._groundTruth_plane.params,
+            self._plane.params,
+            scale_angle=self.action_angle_step,
+            scale_dist=self.action_dist_step,
+        )
 
         self._screen = self._current_state()
 
@@ -277,27 +321,34 @@ class MedicalPlayer(gym.Env):
         next_plane_params = current_plane_params.copy()
         # ---------------------------------------------------------------------
         # theta x+ (param a)
-        if (act==0): next_plane_params[0] += self.action_angle_step
+        if act == 0:
+            next_plane_params[0] += self.action_angle_step
         # theta y+ (param b)
-        if (act==1): next_plane_params[1] += self.action_angle_step
+        if act == 1:
+            next_plane_params[1] += self.action_angle_step
         # theta z+ (param c)
-        if (act==2): next_plane_params[2] += self.action_angle_step
+        if act == 2:
+            next_plane_params[2] += self.action_angle_step
         # dist d+
-        if (act==3): next_plane_params[3] += self.action_dist_step
+        if act == 3:
+            next_plane_params[3] += self.action_dist_step
 
         # theta x- (param a)
-        if (act==4): next_plane_params[0] -= self.action_angle_step
+        if act == 4:
+            next_plane_params[0] -= self.action_angle_step
         # theta y- (param b)
-        if (act==5): next_plane_params[1] -= self.action_angle_step
+        if act == 5:
+            next_plane_params[1] -= self.action_angle_step
         # theta z- (param c)
-        if (act==6): next_plane_params[2] -= self.action_angle_step
+        if act == 6:
+            next_plane_params[2] -= self.action_angle_step
         # dist d-
-        if (act==7): next_plane_params[3] -= self.action_dist_step
+        if act == 7:
+            next_plane_params[3] -= self.action_dist_step
         # ---------------------------------------------------------------------
         # self.reward = self._calc_reward_points(self._plane.points,
         #                                        next_plane.points)
-        self.reward = self._calc_reward_params(current_plane_params,
-                                               next_plane_params)
+        self.reward = self._calc_reward_params(current_plane_params, next_plane_params)
         # threshold reward between -1 and 1
         self.reward = np.sign(self.reward)
         go_out = False
@@ -311,123 +362,158 @@ class MedicalPlayer(gym.Env):
             next_plane_params[0] += self.action_angle_step
             plane_params_queue.append(next_plane_params)
             # dist_queue.append(calcMeanDistTwoPlanes(self._groundTruth_plane.points, plane_params_queue[-1].points))
-            dist_queue.append(calcDistTwoParams(
-                                        self._groundTruth_plane.params,
-                                        plane_params_queue[-1],
-                                        scale_angle = self.action_angle_step,
-                                        scale_dist = self.action_dist_step))
+            dist_queue.append(
+                calcDistTwoParams(
+                    self._groundTruth_plane.params,
+                    plane_params_queue[-1],
+                    scale_angle=self.action_angle_step,
+                    scale_dist=self.action_dist_step,
+                )
+            )
             # theta y+ (param b) ----------------------------------------------
             next_plane_params = np.copy(self._plane.params)
             next_plane_params[1] += self.action_angle_step
             plane_params_queue.append(next_plane_params)
             # dist_queue.append(calcMeanDistTwoPlanes(self._groundTruth_plane.points, plane_params_queue[-1].points))
-            dist_queue.append(calcDistTwoParams(
-                                        self._groundTruth_plane.params,
-                                        plane_params_queue[-1],
-                                        scale_angle = self.action_angle_step,
-                                        scale_dist = self.action_dist_step))
+            dist_queue.append(
+                calcDistTwoParams(
+                    self._groundTruth_plane.params,
+                    plane_params_queue[-1],
+                    scale_angle=self.action_angle_step,
+                    scale_dist=self.action_dist_step,
+                )
+            )
             # theta z+ (param c) ----------------------------------------------
             next_plane_params = np.copy(self._plane.params)
             next_plane_params[2] += self.action_angle_step
             plane_params_queue.append(next_plane_params)
             # dist_queue.append(calcMeanDistTwoPlanes(self._groundTruth_plane.points, plane_params_queue[-1].points))
-            dist_queue.append(calcDistTwoParams(
-                                        self._groundTruth_plane.params,
-                                        plane_params_queue[-1],
-                                        scale_angle = self.action_angle_step,
-                                        scale_dist = self.action_dist_step))
+            dist_queue.append(
+                calcDistTwoParams(
+                    self._groundTruth_plane.params,
+                    plane_params_queue[-1],
+                    scale_angle=self.action_angle_step,
+                    scale_dist=self.action_dist_step,
+                )
+            )
             # dist d+ ---------------------------------------------------------
             next_plane_params = np.copy(self._plane.params)
             next_plane_params[3] += self.action_dist_step
             plane_params_queue.append(next_plane_params)
             # dist_queue.append(calcMeanDistTwoPlanes(self._groundTruth_plane.points, plane_params_queue[-1].points))
-            dist_queue.append(calcDistTwoParams(
-                                        self._groundTruth_plane.params,
-                                        plane_params_queue[-1],
-                                        scale_angle = self.action_angle_step,
-                                        scale_dist = self.action_dist_step))
+            dist_queue.append(
+                calcDistTwoParams(
+                    self._groundTruth_plane.params,
+                    plane_params_queue[-1],
+                    scale_angle=self.action_angle_step,
+                    scale_dist=self.action_dist_step,
+                )
+            )
             # theta x- (param a) ----------------------------------------------
             next_plane_params = np.copy(self._plane.params)
             next_plane_params[0] -= self.action_angle_step
             plane_params_queue.append(next_plane_params)
             # dist_queue.append(calcMeanDistTwoPlanes(self._groundTruth_plane.points, plane_params_queue[-1].points))
-            dist_queue.append(calcDistTwoParams(
-                                        self._groundTruth_plane.params,
-                                        plane_params_queue[-1],
-                                        scale_angle = self.action_angle_step,
-                                        scale_dist = self.action_dist_step))
+            dist_queue.append(
+                calcDistTwoParams(
+                    self._groundTruth_plane.params,
+                    plane_params_queue[-1],
+                    scale_angle=self.action_angle_step,
+                    scale_dist=self.action_dist_step,
+                )
+            )
             # theta y- (param b) ----------------------------------------------
             next_plane_params = np.copy(self._plane.params)
             next_plane_params[1] -= self.action_angle_step
             plane_params_queue.append(next_plane_params)
             # dist_queue.append(calcMeanDistTwoPlanes(self._groundTruth_plane.points, plane_params_queue[-1].points))
-            dist_queue.append(calcDistTwoParams(
-                                        self._groundTruth_plane.params,
-                                        plane_params_queue[-1],
-                                        scale_angle = self.action_angle_step,
-                                        scale_dist = self.action_dist_step))
+            dist_queue.append(
+                calcDistTwoParams(
+                    self._groundTruth_plane.params,
+                    plane_params_queue[-1],
+                    scale_angle=self.action_angle_step,
+                    scale_dist=self.action_dist_step,
+                )
+            )
             # theta z- (param c) ----------------------------------------------
             next_plane_params = np.copy(self._plane.params)
             next_plane_params[2] -= self.action_angle_step
             plane_params_queue.append(next_plane_params)
             # dist_queue.append(calcMeanDistTwoPlanes(self._groundTruth_plane.points, plane_params_queue[-1].points))
-            dist_queue.append(calcDistTwoParams(
-                                        self._groundTruth_plane.params,
-                                        plane_params_queue[-1],
-                                        scale_angle = self.action_angle_step,
-                                        scale_dist = self.action_dist_step))
+            dist_queue.append(
+                calcDistTwoParams(
+                    self._groundTruth_plane.params,
+                    plane_params_queue[-1],
+                    scale_angle=self.action_angle_step,
+                    scale_dist=self.action_dist_step,
+                )
+            )
             # dist d- ---------------------------------------------------------
             next_plane_params = np.copy(self._plane.params)
             next_plane_params[3] -= self.action_dist_step
             plane_params_queue.append(next_plane_params)
             # dist_queue.append(calcMeanDistTwoPlanes(self._groundTruth_plane.points, plane_params_queue[-1].points))
-            dist_queue.append(calcDistTwoParams(
-                                        self._groundTruth_plane.params,
-                                        plane_params_queue[-1],
-                                        scale_angle = self.action_angle_step,
-                                        scale_dist = self.action_dist_step))
+            dist_queue.append(
+                calcDistTwoParams(
+                    self._groundTruth_plane.params,
+                    plane_params_queue[-1],
+                    scale_angle=self.action_angle_step,
+                    scale_dist=self.action_dist_step,
+                )
+            )
 
             # -----------------------------------------------------------------
             # get best plane based on lowest distance to the target
             next_plane_idx = np.argmin(dist_queue)
-            next_plane = Plane(*getPlane(self.sitk_image,
-                                        self._origin3d_point,
-                                        plane_params_queue[next_plane_idx],
-                                        self._plane_size,
-                                        spacing=self.spacing))
+            next_plane = Plane(
+                *getPlane(
+                    self.sitk_image,
+                    self._origin3d_point,
+                    plane_params_queue[next_plane_idx],
+                    self._plane_size,
+                    spacing=self.spacing,
+                )
+            )
             self._dist_supervised_history.append(np.min(dist_queue))
 
         else:
             ## unsupervised or testing
             # get the new plane using new params result from taking the action
-            next_plane = Plane(*getPlane(self.sitk_image,
-                                        self._origin3d_point,
-                                        next_plane_params,
-                                        self._plane_size,
-                                        spacing=self.spacing))
+            next_plane = Plane(
+                *getPlane(
+                    self.sitk_image,
+                    self._origin3d_point,
+                    next_plane_params,
+                    self._plane_size,
+                    spacing=self.spacing,
+                )
+            )
             # -----------------------------------------------------------------
             # check if the screen is not full of zeros (background)
             go_out = checkBackgroundRatio(next_plane, min_pixel_val=0.5, ratio=0.8)
             # also check if go out (sampling from outside the volume)
             # by checking if the new origin
             if not go_out:
-                go_out = checkOriginLocation(self.sitk_image,next_plane.origin)
+                go_out = checkOriginLocation(self.sitk_image, next_plane.origin)
             # also check if plane parameters got very high
             if not go_out:
-                go_out = checkParamsBound(next_plane.params,
-                                          self._groundTruth_plane.params)
+                go_out = checkParamsBound(
+                    next_plane.params, self._groundTruth_plane.params
+                )
             # punish lowest reward if the agent tries to go out and keep same plane
             if go_out:
-                self.reward = -1 # lowest possible reward
+                self.reward = -1  # lowest possible reward
                 next_plane = copy.deepcopy(self._plane)
-                if self.train:  self.terminal = True # end episode and restart
+                if self.train:
+                    self.terminal = True  # end episode and restart
 
         # ---------------------------------------------------------------------
         # update current plane
         self._plane = copy.deepcopy(next_plane)
         # terminate if maximum number of steps is reached
         self.cnt += 1
-        if self.cnt >= self.max_num_frames: self.terminal = True
+        if self.cnt >= self.max_num_frames:
+            self.terminal = True
         # check oscillation and reduce action step or terminate if minimum
         if self._oscillate:
             if self.train and self._supervised:
@@ -437,25 +523,39 @@ class MedicalPlayer(gym.Env):
 
             # find distance metrics
             # self.cur_dist = calcMeanDistTwoPlanes(self._groundTruth_plane.points, self._plane.points)
-            _, dist = zip(*[projectPointOnPlane(point, self._plane.norm, self._plane.origin) for point in self.landmarks_gt])
+            _, dist = zip(
+                *[
+                    projectPointOnPlane(point, self._plane.norm, self._plane.origin)
+                    for point in self.landmarks_gt
+                ]
+            )
             self.cur_dist = np.max(np.abs(dist))
             self._update_heirarchical()
             self._clear_history()
             # terminate if distance steps are less than 1
-            if self.action_dist_step < 1:   self.terminal = True
+            if self.action_dist_step < 1:
+                self.terminal = True
 
         # ---------------------------------------------------------------------
         # find distance error
-        _, dist = zip(*[projectPointOnPlane(point, self._plane.norm, self._plane.origin) for point in self.landmarks_gt])
+        _, dist = zip(
+            *[
+                projectPointOnPlane(point, self._plane.norm, self._plane.origin)
+                for point in self.landmarks_gt
+            ]
+        )
         self.cur_dist = np.mean(np.abs(dist))
-        self.cur_dist_params = calcDistTwoParams(self._groundTruth_plane.params                            , self._plane.params,
-                                        scale_angle = self.action_angle_step,
-                                        scale_dist = self.action_dist_step)
+        self.cur_dist_params = calcDistTwoParams(
+            self._groundTruth_plane.params,
+            self._plane.params,
+            scale_angle=self.action_angle_step,
+            scale_dist=self.action_dist_step,
+        )
         self.current_episode_score.feed(self.reward)
-        self._update_history() # store results in memory
+        self._update_history()  # store results in memory
 
         # terminate if distance between params are low during training
-        if self.train and (self.cur_dist_params<=1):
+        if self.train and (self.cur_dist_params <= 1):
             self.terminal = True
             self.num_success.feed(1)
 
@@ -478,47 +578,52 @@ class MedicalPlayer(gym.Env):
         B = normalizeUnitVector(self._plane.norm)
         angle_between_norms = np.rad2deg(np.arccos(A.dot(B)))
 
-        info = {'score': self.current_episode_score.sum, 'gameOver': self.terminal,
-                'distError': self.cur_dist, 'distAngle': angle_between_norms,
-                'filename':self.filename}
+        info = {
+            "score": self.current_episode_score.sum,
+            "gameOver": self.terminal,
+            "distError": self.cur_dist,
+            "distAngle": angle_between_norms,
+            "filename": self.filename,
+        }
 
         if self.terminal:
-            with open(self.csvfile, 'a') as outcsv:
-                fields= [self.filename, self.cur_dist, angle_between_norms]
+            with open(self.csvfile, "a") as outcsv:
+                fields = [self.filename, self.cur_dist, angle_between_norms]
                 writer = csv.writer(outcsv)
                 writer.writerow(map(lambda x: x, fields))
 
         return self._current_state(), self.reward, self.terminal, info
 
-
-
     # -------------------------------------------------------------------------
 
     def _update_heirarchical(self):
-        self.action_angle_step = int(self.action_angle_step/2)
-        self.action_dist_step = self.action_dist_step-1
+        self.action_angle_step = int(self.action_angle_step / 2)
+        self.action_dist_step = self.action_dist_step - 1
         # self.spacing -= 1
-        if (self.spacing[0] > 1): self.spacing -= 1
-        self._groundTruth_plane = Plane(*getGroundTruthPlane(
-                                            self.sitk_image,
-                                            self.sitk_image_4ch,
-                                            self._origin3d_point,
-                                            self._plane_size,
-                                            spacing=self.spacing))
-
+        if self.spacing[0] > 1:
+            self.spacing -= 1
+        self._groundTruth_plane = Plane(
+            *getGroundTruthPlane(
+                self.sitk_image,
+                self.sitk_image_4ch,
+                self._origin3d_point,
+                self._plane_size,
+                spacing=self.spacing,
+            )
+        )
 
     def getBestPlane(self):
-        ''' get best location with best qvalue from last for locations
+        """ get best location with best qvalue from last for locations
         stored in history
-        '''
+        """
         best_idx = np.argmin(self._bestq_history)
         # best_idx = np.argmax(self._bestq_history)
         return self._plane_history[best_idx]
 
     def getBestPlaneTrain(self):
-        ''' get best location with best qvalue from last for locations
+        """ get best location with best qvalue from last for locations
         stored in history
-        '''
+        """
         best_idx = np.argmin(self._dist_supervised_history)
         # best_idx = np.argmax(self._bestq_history)
         return self._plane_history[best_idx]
@@ -528,7 +633,6 @@ class MedicalPlayer(gym.Env):
         :returns: a gray-scale (h, w, d) float ###uint8 image
         """
         return self._plane.grid_smooth
-
 
     def _clear_history(self):
         self._plane_history.clear()
@@ -540,20 +644,20 @@ class MedicalPlayer(gym.Env):
         self._loc_history = [(0,) * 4] * self._history_length
         self._qvalues_history = [(0,) * self.actions] * self._history_length
 
-
-
     def _update_history(self):
-        ''' update history buffer with current state
-        '''
+        """ update history buffer with current state
+        """
         # update location history
         self._loc_history[:-1] = self._loc_history[1:]
         loc = self._plane.origin
         loc = self._plane.params
         # logger.info('loc {}'.format(loc))
-        self._loc_history[-1] = (np.around(loc[0],decimals=2),
-                                 np.around(loc[1],decimals=2),
-                                 np.around(loc[2],decimals=2),
-                                 np.around(loc[3],decimals=2))
+        self._loc_history[-1] = (
+            np.around(loc[0], decimals=2),
+            np.around(loc[1], decimals=2),
+            np.around(loc[2], decimals=2),
+            np.around(loc[3], decimals=2),
+        )
         # update distance history
         self._dist_history.append(self.cur_dist)
         self._dist_history_params.append(self.cur_dist_params)
@@ -565,61 +669,64 @@ class MedicalPlayer(gym.Env):
         self._qvalues_history[-1] = self._qvalues
 
     def _calc_reward_points(self, prev_points, next_points):
-        ''' Calculate the new reward based on the euclidean distance to the target plane
-        '''
-        prev_dist = calcMeanDistTwoPlanes(self._groundTruth_plane.points,
-                                         prev_points)
-        next_dist = calcMeanDistTwoPlanes(self._groundTruth_plane.points,
-                                         next_points)
+        """ Calculate the new reward based on the euclidean distance to the target plane
+        """
+        prev_dist = calcMeanDistTwoPlanes(self._groundTruth_plane.points, prev_points)
+        next_dist = calcMeanDistTwoPlanes(self._groundTruth_plane.points, next_points)
 
         return prev_dist - next_dist
 
     def _calc_reward_params(self, prev_params, next_params):
-        ''' Calculate the new reward based on the euclidean distance to the target plane
-        '''
+        """ Calculate the new reward based on the euclidean distance to the target plane
+        """
         # logger.info('prev_params {}'.format(np.around(prev_params,2)))
         # logger.info('next_params {}'.format(np.around(next_params,2)))
-        prev_dist = calcScaledDistTwoParams(self._groundTruth_plane.params,
-                                      prev_params,
-                                      scale_angle = self.action_angle_step,
-                                      scale_dist = self.action_dist_step)
-        next_dist = calcScaledDistTwoParams(self._groundTruth_plane.params,
-                                      next_params,
-                                      scale_angle = self.action_angle_step,
-                                      scale_dist = self.action_dist_step)
+        prev_dist = calcScaledDistTwoParams(
+            self._groundTruth_plane.params,
+            prev_params,
+            scale_angle=self.action_angle_step,
+            scale_dist=self.action_dist_step,
+        )
+        next_dist = calcScaledDistTwoParams(
+            self._groundTruth_plane.params,
+            next_params,
+            scale_angle=self.action_angle_step,
+            scale_dist=self.action_dist_step,
+        )
 
         return prev_dist - next_dist
 
     @property
     def _oscillate(self):
-        ''' Return True if the agent is stuck and oscillating
-        '''
+        """ Return True if the agent is stuck and oscillating
+        """
         counter = Counter(self._loc_history)
         freq = counter.most_common()
         # return false is history is empty (begining of the game)
-        if len(freq) < 2: return False
+        if len(freq) < 2:
+            return False
         # check frequency
-        if freq[0][0] == (0,0,0,0):
-            if (freq[1][1]>2):
+        if freq[0][0] == (0, 0, 0, 0):
+            if freq[1][1] > 2:
                 # logger.info('oscillating {}'.format(self._loc_history))
                 return True
             else:
                 return False
-        elif (freq[0][1]>2):
+        elif freq[0][1] > 2:
             # logger.info('oscillating {}'.format(self._loc_history))
             return True
 
     def get_action_meanings(self):
-        ''' return array of integers for actions '''
+        """ return array of integers for actions """
         ACTION_MEANING = {
-            0 : "inc_x",    # increment +1 the norm angle in x-direction
-            1 : "inc_y",    # increment +1 the norm angle in y-direction
-            2 : "inc_z",    # increment +1 the norm angle in z-direction
-            3 : "inc_d",    # increment +1 the norm distance d to origin
-            4 : "dec_x",    # decrement -1 the norm angle in x-direction
-            5 : "dec_y",    # decrement -1 the norm angle in y-direction
-            6 : "dec_z",    # decrement -1 the norm angle in z-direction
-            7 : "dec_d",    # decrement -1 the norm distance d to origin
+            0: "inc_x",  # increment +1 the norm angle in x-direction
+            1: "inc_y",  # increment +1 the norm angle in y-direction
+            2: "inc_z",  # increment +1 the norm angle in z-direction
+            3: "inc_d",  # increment +1 the norm distance d to origin
+            4: "dec_x",  # decrement -1 the norm angle in x-direction
+            5: "dec_y",  # decrement -1 the norm angle in y-direction
+            6: "dec_z",  # decrement -1 the norm angle in z-direction
+            7: "dec_d",  # decrement -1 the norm distance d to origin
         }
         return [ACTION_MEANING[i] for i in self.actions]
 
@@ -639,8 +746,6 @@ class MedicalPlayer(gym.Env):
         self.num_games = StatCounter()
         self.num_success = StatCounter()
 
-
-
     def display(self, return_rgb_array=False):
         # pass
         # --------------------------------------------------------------------
@@ -653,21 +758,25 @@ class MedicalPlayer(gym.Env):
         ## whole plan
         # image_size = (int(min(self._image_dims)),)*3
         image_size = self._image_dims
-        current_plane = Plane(*getPlane(self.sitk_image,
-                                self._origin3d_point,
-                                self._plane.params,
-                                image_size,
-                                spacing=[1,1,1]))
+        current_plane = Plane(
+            *getPlane(
+                self.sitk_image,
+                self._origin3d_point,
+                self._plane.params,
+                image_size,
+                spacing=[1, 1, 1],
+            )
+        )
 
         # get image and convert it to pyglet
-        plane = current_plane.grid[:,:,int(image_size[2]/2)] # z-plane
+        plane = current_plane.grid[:, :, int(image_size[2] / 2)]  # z-plane
         # concatenate groundtruth image
-        gt_plane = self.groundTruth_plane_iso.grid[:,:,int(image_size[2]/2)]
+        gt_plane = self.groundTruth_plane_iso.grid[:, :, int(image_size[2] / 2)]
         # --------------------------------------------------------------------
         # concatenate two planes side by side
-        plane = np.concatenate((plane,gt_plane),axis=1)
+        plane = np.concatenate((plane, gt_plane), axis=1)
         #
-        img = cv2.cvtColor(plane,cv2.COLOR_GRAY2RGB) # congvert to rgb
+        img = cv2.cvtColor(plane, cv2.COLOR_GRAY2RGB)  # congvert to rgb
         # rescale image
         # INTER_NEAREST, INTER_LINEAR, INTER_AREA, INTER_CUBIC, INTER_LANCZOS4
         scale_x = 5
@@ -678,93 +787,121 @@ class MedicalPlayer(gym.Env):
         # skip if there is a viewer open
         if (not self.viewer) and self.viz:
             from viewer import SimpleImageViewer
-            self.viewer = SimpleImageViewer(arr=img,
-                                            scale_x=1,
-                                            scale_y=1,
-                                            filepath=self.filename)
+
+            self.viewer = SimpleImageViewer(
+                arr=img, scale_x=1, scale_y=1, filepath=self.filename
+            )
             self.gif_buffer = []
 
         # display image
         self.viewer.draw_image(img)
-        self.viewer.display_text('Current Plane', color=(0,0,204,255),
-                                 x=int(0.7*img.shape[1]/7), y=img.shape[0]-3)
-        self.viewer.display_text('Ground Truth', color=(0,0,204,255),
-                                 x=int(4.3*img.shape[1]/7), y=img.shape[0]-3)
+        self.viewer.display_text(
+            "Current Plane",
+            color=(0, 0, 204, 255),
+            x=int(0.7 * img.shape[1] / 7),
+            y=img.shape[0] - 3,
+        )
+        self.viewer.display_text(
+            "Ground Truth",
+            color=(0, 0, 204, 255),
+            x=int(4.3 * img.shape[1] / 7),
+            y=img.shape[0] - 3,
+        )
 
         # display info
         dist_color_flag = False
-        if len(self._dist_history)>1:
-            dist_color_flag = self.cur_dist<self._dist_history[-2]
+        if len(self._dist_history) > 1:
+            dist_color_flag = self.cur_dist < self._dist_history[-2]
 
-        color_dist = (0,204,0,255) if dist_color_flag else (204,0,0,255)
-        text = 'Error ' + str(round(self.cur_dist,3)) + 'mm'
-        self.viewer.display_text(text, color=color_dist,
-                                 x=int(3*img.shape[1]/8), y=5*scale_y)
+        color_dist = (0, 204, 0, 255) if dist_color_flag else (204, 0, 0, 255)
+        text = "Error " + str(round(self.cur_dist, 3)) + "mm"
+        self.viewer.display_text(
+            text, color=color_dist, x=int(3 * img.shape[1] / 8), y=5 * scale_y
+        )
 
         dist_color_flag = False
-        if len(self._dist_history_params)>1:
-            dist_color_flag = self.cur_dist_params<self._dist_history_params[-2]
+        if len(self._dist_history_params) > 1:
+            dist_color_flag = self.cur_dist_params < self._dist_history_params[-2]
 
         # color_dist = (0,255,0,255) if dist_color_flag else (255,0,0,255)
         # text = 'Params Error ' + str(round(self.cur_dist_params,3))
         # self.viewer.display_text(text, color=color_dist,
-                                 # x=int(6*img.shape[1]/8), y=5*scale_y)
-        text = 'Spacing ' + str(round(self.spacing[0],3)) + 'mm'
-        self.viewer.display_text(text, color=(204,204,0,255),
-                                 x=int(6*img.shape[1]/8), y=5*scale_y)
+        # x=int(6*img.shape[1]/8), y=5*scale_y)
+        text = "Spacing " + str(round(self.spacing[0], 3)) + "mm"
+        self.viewer.display_text(
+            text, color=(204, 204, 0, 255), x=int(6 * img.shape[1] / 8), y=5 * scale_y
+        )
 
-        color_reward = (0,204,0,255) if self.reward>0 else (204,0,0,255)
-        text = 'Reward ' + "%+d" % round(self.reward,3)
-        self.viewer.display_text(text, color=color_reward,
-                                 x=2*scale_x, y=5*scale_y)
+        color_reward = (0, 204, 0, 255) if self.reward > 0 else (204, 0, 0, 255)
+        text = "Reward " + "%+d" % round(self.reward, 3)
+        self.viewer.display_text(text, color=color_reward, x=2 * scale_x, y=5 * scale_y)
 
         # render and wait (viz) time between frames
         self.viewer.render()
 
         # save gif
         if self.saveGif:
-            image_data = pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
-            data = image_data.get_data('RGB', image_data.width * 3)
+            image_data = (
+                pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
+            )
+            data = image_data.get_data("RGB", image_data.width * 3)
             # set_trace()
-            arr = np.array(bytearray(data)).astype('uint8')
-            arr = np.flip(np.reshape(arr,(image_data.height, image_data.width, -1)),0)
-            im = Image.fromarray(arr).convert('P')
+            arr = np.array(bytearray(data)).astype("uint8")
+            arr = np.flip(np.reshape(arr, (image_data.height, image_data.width, -1)), 0)
+            im = Image.fromarray(arr).convert("P")
             self.gif_buffer.append(im)
 
             if not self.terminal:
-                gifname = self.filename.split('.')[0] + '.gif'
-                self.viewer.savegif(gifname,arr=self.gif_buffer, duration=self.viz)
+                gifname = self.filename.split(".")[0] + ".gif"
+                self.viewer.savegif(gifname, arr=self.gif_buffer, duration=self.viz)
         if self.saveVideo:
-            dirname = 'tmp_video'
-            if (self.cnt <=1):
+            dirname = "tmp_video"
+            if self.cnt <= 1:
                 if os.path.isdir(dirname):
-                    logger.warn("""Log directory {} exists! Use 'd' to delete it. """.format(dirname))
-                    act = input("select action: d (delete) / q (quit): ").lower().strip()
-                    if act == 'd':
+                    logger.warn(
+                        """Log directory {} exists! Use 'd' to delete it. """.format(
+                            dirname
+                        )
+                    )
+                    act = (
+                        input("select action: d (delete) / q (quit): ").lower().strip()
+                    )
+                    if act == "d":
                         shutil.rmtree(dirname, ignore_errors=True)
                     else:
                         raise OSError("Directory {} exits!".format(dirname))
                 os.mkdir(dirname)
 
-            frame = dirname + '/' + '%04d' % self.cnt + '.png'
+            frame = dirname + "/" + "%04d" % self.cnt + ".png"
             pyglet.image.get_buffer_manager().get_color_buffer().save(frame)
             if self.terminal:
-                save_cmd = ['ffmpeg','-f', 'image2', '-framerate', '30',
-                    '-pattern_type', 'sequence', '-start_number', '0', '-r',
-                    '3', '-i', dirname + '/%04d.png', '-s', '1280x720',
-                    '-vcodec', 'libx264', '-b:v', '2567k', self.filename+'.mp4']
+                save_cmd = [
+                    "ffmpeg",
+                    "-f",
+                    "image2",
+                    "-framerate",
+                    "30",
+                    "-pattern_type",
+                    "sequence",
+                    "-start_number",
+                    "0",
+                    "-r",
+                    "3",
+                    "-i",
+                    dirname + "/%04d.png",
+                    "-s",
+                    "1280x720",
+                    "-vcodec",
+                    "libx264",
+                    "-b:v",
+                    "2567k",
+                    self.filename + ".mp4",
+                ]
                 subprocess.check_output(save_cmd)
                 shutil.rmtree(dirname, ignore_errors=True)
 
 
-
-
-
-
-
-
 class DiscreteActionSpace(object):
-
     def __init__(self, num):
         super(DiscreteActionSpace, self).__init__()
         self.num = num
@@ -782,6 +919,7 @@ class DiscreteActionSpace(object):
     def __str__(self):
         return "DiscreteActionSpace({})".format(self.num)
 
+
 # =============================================================================
 # ================================ FrameStack =================================
 # =============================================================================
@@ -789,7 +927,7 @@ class FrameStack(gym.Wrapper):
     def __init__(self, env, k):
         """Buffer observations and stack across channels (last axis)."""
         gym.Wrapper.__init__(self, env)
-        self.k = k # history length
+        self.k = k  # history length
         self.frames = deque([], maxlen=k)
         shp = env.observation_space.shape
         # chan = 1 if len(shp) == 2 else shp[2]
@@ -807,7 +945,7 @@ class FrameStack(gym.Wrapper):
         return self._observation()
 
     def step(self, action, qvalues):
-        ob, reward, done, info = self.env.step(action,qvalues)
+        ob, reward, done, info = self.env.step(action, qvalues)
         self.frames.append(ob)
         return self._observation(), reward, done, info
 

@@ -7,8 +7,12 @@
 from collections import deque
 from tensorpack_medical.RL.envbase import ProxyPlayer
 
-__all__ = ['PreventStuckPlayer', 'LimitLengthPlayer', 'AutoRestartPlayer',
-           'MapPlayerState']
+__all__ = [
+    "PreventStuckPlayer",
+    "LimitLengthPlayer",
+    "AutoRestartPlayer",
+    "MapPlayerState",
+]
 
 
 class PreventStuckPlayer(ProxyPlayer):
@@ -18,6 +22,7 @@ class PreventStuckPlayer(ProxyPlayer):
 
     It does auto-reset, but doesn't auto-restart the underlying player.
     """
+
     # TODO hash the state as well?
 
     def __init__(self, player, nr_repeat, action):

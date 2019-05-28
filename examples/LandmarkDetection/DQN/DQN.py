@@ -3,9 +3,13 @@
 # File: DQN.py
 # Author: Amir Alansary <amiralansary@gmail.com>
 
+
 def warn(*args, **kwargs):
     pass
+
+
 import warnings
+
 warnings.warn = warn
 warnings.simplefilter("ignore", category=PendingDeprecationWarning)
 
@@ -26,12 +30,25 @@ from common import Evaluator, eval_model_multithread, play_n_episodes
 from DQNModel import Model3D as DQNModel
 from expreplay import ExpReplay
 
-from tensorpack import (PredictConfig, OfflinePredictor, get_model_loader,
-                        logger, TrainConfig, ModelSaver, PeriodicTrigger,
-                        ScheduledHyperParamSetter, ObjAttrParam,
-                        HumanHyperParamSetter, argscope, RunOp, LinearWrap,
-                        FullyConnected, PReLU, SimpleTrainer,
-                        launch_train_with_config)
+from tensorpack import (
+    PredictConfig,
+    OfflinePredictor,
+    get_model_loader,
+    logger,
+    TrainConfig,
+    ModelSaver,
+    PeriodicTrigger,
+    ScheduledHyperParamSetter,
+    ObjAttrParam,
+    HumanHyperParamSetter,
+    argscope,
+    RunOp,
+    LinearWrap,
+    FullyConnected,
+    PReLU,
+    SimpleTrainer,
+    launch_train_with_config,
+)
 
 
 ###############################################################################
@@ -45,11 +62,11 @@ FRAME_HISTORY = 4
 # the frequency of updating the target network
 UPDATE_FREQ = 4
 # DISCOUNT FACTOR - NATURE (0.99) - MEDICAL (0.9)
-GAMMA = 0.9 #0.99
+GAMMA = 0.9  # 0.99
 # REPLAY MEMORY SIZE - NATURE (1e6) - MEDICAL (1e5 view-patches)
-MEMORY_SIZE = 1e5#6
+MEMORY_SIZE = 1e5  # 6
 # consume at least 1e6 * 27 * 27 * 27 bytes
-INIT_MEMORY_SIZE = MEMORY_SIZE // 20 #5e4
+INIT_MEMORY_SIZE = MEMORY_SIZE // 20  # 5e4
 # each epoch is 100k played frames
 # STEPS_PER_EPOCH = 10000 // UPDATE_FREQ * 10
 STEPS_PER_EPOCH = 4604
@@ -60,26 +77,50 @@ EVAL_EPISODE = 50
 
 ###############################################################################
 
-def get_player(directory=None, files_list= None, viz=False,
-               task='play', saveGif=False, saveVideo=False, fiducial=0):
+
+def get_player(
+    directory=None,
+    files_list=None,
+    viz=False,
+    task="play",
+    saveGif=False,
+    saveVideo=False,
+    fiducial=0,
+    infDir="../inference",
+):
     # in atari paper, max_num_frames = 30000
-    env = MedicalPlayer(directory=directory, screen_dims=IMAGE_SIZE,
-                        viz=viz, saveGif=saveGif, saveVideo=saveVideo,
-                        task=task, files_list=files_list, max_num_frames=1500, fiducial=fiducial)
-    if (task != 'train'):
+    env = MedicalPlayer(
+        directory=directory,
+        screen_dims=IMAGE_SIZE,
+        viz=viz,
+        saveGif=saveGif,
+        saveVideo=saveVideo,
+        task=task,
+        files_list=files_list,
+        max_num_frames=1500,
+        fiducial=fiducial,
+        infDir=infDir,
+    )
+    if task != "train":
         # in training, env will be decorated by ExpReplay, and history
         # is taken care of in expreplay buffer
         # otherwise, FrameStack modifies self.step to save observations into a queue
         env = FrameStack(env, FRAME_HISTORY)
     return env
 
+
 def get_player_fn(*myargs, **kwargs):
-    return get_player(fiducial=args.fiducial, *myargs, **kwargs)
+    return get_player(fiducial=args.fiducial, infDir=args.inferDir, *myargs, **kwargs)
+
+
 ###############################################################################
+
 
 class Model(DQNModel):
     def __init__(self):
-        super(Model, self).__init__(IMAGE_SIZE, FRAME_HISTORY, METHOD, NUM_ACTIONS, GAMMA)
+        super(Model, self).__init__(
+            IMAGE_SIZE, FRAME_HISTORY, METHOD, NUM_ACTIONS, GAMMA
+        )
 
     def _get_DQN_prediction(self, image):
         """ image: [0,255]
@@ -90,45 +131,62 @@ class Model(DQNModel):
 
         with argscope(Conv3D, nl=PReLU.symbolic_function, use_bias=True):
             # core layers of the network
-            conv = (LinearWrap(image)
-                 .Conv3D('conv0', out_channel=32,
-                         kernel_shape=[5,5,5], stride=[1,1,1])
-                 .MaxPooling3D('pool0',2)
-                 .Conv3D('conv1', out_channel=32,
-                         kernel_shape=[5,5,5], stride=[1,1,1])
-                 .MaxPooling3D('pool1',2)
-                 .Conv3D('conv2', out_channel=64,
-                         kernel_shape=[4,4,4], stride=[1,1,1])
-                 .MaxPooling3D('pool2',2)
-                 .Conv3D('conv3', out_channel=64,
-                         kernel_shape=[3,3,3], stride=[1,1,1])
-                 # .MaxPooling3D('pool3',2)
-                 )
+            conv = (
+                LinearWrap(image)
+                .Conv3D(
+                    "conv0", out_channel=32, kernel_shape=[5, 5, 5], stride=[1, 1, 1]
+                )
+                .MaxPooling3D("pool0", 2)
+                .Conv3D(
+                    "conv1", out_channel=32, kernel_shape=[5, 5, 5], stride=[1, 1, 1]
+                )
+                .MaxPooling3D("pool1", 2)
+                .Conv3D(
+                    "conv2", out_channel=64, kernel_shape=[4, 4, 4], stride=[1, 1, 1]
+                )
+                .MaxPooling3D("pool2", 2)
+                .Conv3D(
+                    "conv3", out_channel=64, kernel_shape=[3, 3, 3], stride=[1, 1, 1]
+                )
+                # .MaxPooling3D('pool3',2)
+            )
 
-        if 'Dueling' not in self.method:
-            lq = (conv
-                 .FullyConnected('fc0', 512).tf.nn.leaky_relu(alpha=0.01)
-                 .FullyConnected('fc1', 256).tf.nn.leaky_relu(alpha=0.01)
-                 .FullyConnected('fc2', 128).tf.nn.leaky_relu(alpha=0.01)())
-            Q = FullyConnected('fct', lq, self.num_actions, nl=tf.identity)
+        if "Dueling" not in self.method:
+            lq = (
+                conv.FullyConnected("fc0", 512)
+                .tf.nn.leaky_relu(alpha=0.01)
+                .FullyConnected("fc1", 256)
+                .tf.nn.leaky_relu(alpha=0.01)
+                .FullyConnected("fc2", 128)
+                .tf.nn.leaky_relu(alpha=0.01)()
+            )
+            Q = FullyConnected("fct", lq, self.num_actions, nl=tf.identity)
         else:
             # Dueling DQN or Double Dueling
             # state value function
-            lv = (conv
-                 .FullyConnected('fc0V', 512).tf.nn.leaky_relu(alpha=0.01)
-                 .FullyConnected('fc1V', 256).tf.nn.leaky_relu(alpha=0.01)
-                 .FullyConnected('fc2V', 128).tf.nn.leaky_relu(alpha=0.01)())
-            V = FullyConnected('fctV', lv, 1, nl=tf.identity)
+            lv = (
+                conv.FullyConnected("fc0V", 512)
+                .tf.nn.leaky_relu(alpha=0.01)
+                .FullyConnected("fc1V", 256)
+                .tf.nn.leaky_relu(alpha=0.01)
+                .FullyConnected("fc2V", 128)
+                .tf.nn.leaky_relu(alpha=0.01)()
+            )
+            V = FullyConnected("fctV", lv, 1, nl=tf.identity)
             # advantage value function
-            la = (conv
-                 .FullyConnected('fc0A', 512).tf.nn.leaky_relu(alpha=0.01)
-                 .FullyConnected('fc1A', 256).tf.nn.leaky_relu(alpha=0.01)
-                 .FullyConnected('fc2A', 128).tf.nn.leaky_relu(alpha=0.01)())
-            As = FullyConnected('fctA', la, self.num_actions, nl=tf.identity)
+            la = (
+                conv.FullyConnected("fc0A", 512)
+                .tf.nn.leaky_relu(alpha=0.01)
+                .FullyConnected("fc1A", 256)
+                .tf.nn.leaky_relu(alpha=0.01)
+                .FullyConnected("fc2A", 128)
+                .tf.nn.leaky_relu(alpha=0.01)()
+            )
+            As = FullyConnected("fctA", la, self.num_actions, nl=tf.identity)
 
             Q = tf.add(As, V - tf.reduce_mean(As, 1, keepdims=True))
 
-        return tf.identity(Q, name='Qvalue')
+        return tf.identity(Q, name="Qvalue")
 
 
 ###############################################################################
@@ -143,22 +201,22 @@ def get_initial_value(epoch):
         laste, lastv = e, v
     if laste is None or laste == e:
         return None
-    v = (epoch - laste) * 1. / (e - laste) * (v - lastv) + lastv
+    v = (epoch - laste) * 1.0 / (e - laste) * (v - lastv) + lastv
     return v
 
 
 def get_config(files_list, last, fiducial=0):
     """This is only used during training."""
     expreplay = ExpReplay(
-        predictor_io_names=(['state'], ['Qvalue']),
-        player=get_player(task='train', files_list=files_list, fiducial=fiducial),
+        predictor_io_names=(["state"], ["Qvalue"]),
+        player=get_player(task="train", files_list=files_list, fiducial=fiducial),
         state_shape=IMAGE_SIZE,
         batch_size=BATCH_SIZE,
         memory_size=MEMORY_SIZE,
         init_memory_size=INIT_MEMORY_SIZE,
         init_exploration=get_initial_value(last),
         update_frequency=UPDATE_FREQ,
-        history_len=FRAME_HISTORY
+        history_len=FRAME_HISTORY,
     )
 
     return TrainConfig(
@@ -170,104 +228,225 @@ def get_config(files_list, last, fiducial=0):
             PeriodicTrigger(
                 RunOp(DQNModel.update_target_param, verbose=True),
                 # update target network every 10k steps
-                every_k_steps=10000 // UPDATE_FREQ),
+                every_k_steps=10000 // UPDATE_FREQ,
+            ),
             expreplay,
-            ScheduledHyperParamSetter('learning_rate',
-                                      [(60, 4e-4), (100, 2e-4)]),
+            ScheduledHyperParamSetter("learning_rate", [(60, 4e-4), (100, 2e-4)]),
             ScheduledHyperParamSetter(
-                ObjAttrParam(expreplay, 'exploration'),
+                ObjAttrParam(expreplay, "exploration"),
                 # 1->0.1 in the first million steps
                 [(0, 1), (10, 0.1), (320, 0.01)],
-                interp='linear'),
+                interp="linear",
+            ),
             PeriodicTrigger(
-                Evaluator(nr_eval=EVAL_EPISODE, input_names=['state'],
-                          output_names=['Qvalue'], files_list=files_list,
-                          get_player_fn=get_player_fn),
-                every_k_epochs=EPOCHS_PER_EVAL),
-            HumanHyperParamSetter('learning_rate'),
+                Evaluator(
+                    nr_eval=EVAL_EPISODE,
+                    input_names=["state"],
+                    output_names=["Qvalue"],
+                    files_list=files_list,
+                    get_player_fn=get_player_fn,
+                ),
+                every_k_epochs=EPOCHS_PER_EVAL,
+            ),
+            HumanHyperParamSetter("learning_rate"),
         ],
         steps_per_epoch=STEPS_PER_EPOCH,
         max_epoch=1000,
     )
 
 
-
 ###############################################################################
 ###############################################################################
 
+fidNumToName = {
+    0: "AC",
+    1: "BPons",
+    2: "CM",
+    3: "LE",
+    4: "PC",
+    5: "RE",
+    6: "RP",
+    7: "RP_front",
+    8: "SMV",
+    9: "VN4",
+    10: "callosum_left",
+    11: "callosum_right",
+    12: "dens_axis",
+    13: "genu",
+    14: "l_caud_head",
+    15: "l_corp",
+    16: "l_front_pole",
+    17: "l_inner_corpus",
+    18: "l_lat_ext",
+    19: "l_occ_pole",
+    20: "l_prim_ext",
+    21: "l_sup_ext",
+    22: "l_temp_pole",
+    23: "lat_left",
+    24: "lat_right",
+    25: "lat_ven_left",
+    26: "lat_ven_right",
+    27: "left_cereb",
+    28: "left_lateral_inner_ear",
+    29: "m_ax_inf",
+    30: "m_ax_sup",
+    31: "mid_basel",
+    32: "mid_lat",
+    33: "mid_prim_inf",
+    34: "mid_prim_sup",
+    35: "mid_sup",
+    36: "optic_chiasm",
+    37: "r_caud_head",
+    38: "r_corp",
+    39: "r_front_pole",
+    40: "r_inner_corpus",
+    41: "r_lat_ext",
+    42: "r_occ_pole",
+    43: "r_prim_ext",
+    44: "r_sup_ext",
+    45: "r_temp_pole",
+    46: "right_lateral_inner_ear",
+    47: "rostrum",
+    48: "rostrum_front",
+    49: "top_left",
+    50: "top_right",
+}
 
-if __name__ == '__main__':
+fidNametoNum = {v: k for k, v in fidNumToName.items()}
+
+
+if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--gpu', help='comma separated list of GPU(s) to use.')
-    parser.add_argument('--load', help='load model')
-    parser.add_argument('--task', help='task to perform. Must load a pretrained model if task is "play" or "eval"',
-                        choices=['play', 'eval', 'train'], default='train')
-    parser.add_argument('--algo', help='algorithm',
-                        choices=['DQN', 'Double', 'Dueling','DuelingDouble'],
-                        default='DQN')
-    parser.add_argument('--files', type=argparse.FileType('r'), nargs='+',
-                        help="""Filepath to the text file that comtains list of images.
+    parser.add_argument("--gpu", help="comma separated list of GPU(s) to use.")
+    parser.add_argument("--load", help="load model")
+    parser.add_argument(
+        "--task",
+        help='task to perform. Must load a pretrained model if task is "play" or "eval"',
+        choices=["play", "eval", "train"],
+        default="train",
+    )
+    parser.add_argument(
+        "--algo",
+        help="algorithm",
+        choices=["DQN", "Double", "Dueling", "DuelingDouble"],
+        default="DQN",
+    )
+    parser.add_argument(
+        "--files",
+        type=argparse.FileType("r"),
+        nargs="+",
+        help="""Filepath to the text file that comtains list of images.
                                 Each line of this file is a full path to an image scan.
-                                For (task == train or eval) there should be two input files ['images', 'landmarks']""")
-    parser.add_argument('--saveGif', help='save gif image of the game',
-                        action='store_true', default=False)
-    parser.add_argument('--saveVideo', help='save video of the game',
-                        action='store_true', default=False)
-    parser.add_argument('--logDir', help='store logs in this directory during training',
-                        default='train_log')
-    parser.add_argument('--name', help='name of current experiment for logs',
-                        default='experiment_1')
-    parser.add_argument('--lastEpoch', type=int, help='if loading a model, specify the last epoch you trained it on',
-                        default=0)
-    parser.add_argument('--fiducial', type=int, help='index of the fiducial', default=0)
-    parser.add_argument('--fidName', help='name of the fiducial', default='fiducial_name')
-    parser.add_argument('--inferDir', help='directory to save the inferences', default='../inference')
+                                For (task == train or eval) there should be two input files ['images', 'landmarks']""",
+    )
+    parser.add_argument(
+        "--saveGif",
+        help="save gif image of the game",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
+        "--saveVideo", help="save video of the game", action="store_true", default=False
+    )
+    parser.add_argument(
+        "--logDir",
+        help="store logs in this directory during training",
+        default="train_log",
+    )
+    parser.add_argument(
+        "--name", help="name of current experiment for logs", default="experiment_1"
+    )
+    parser.add_argument(
+        "--lastEpoch",
+        type=int,
+        help="if loading a model, specify the last epoch you trained it on",
+        default=0,
+    )
+    parser.add_argument("--fiducial", help="index of the fiducial", default=0)
+    parser.add_argument(
+        "--inferDir", help="directory to save the inferences", default="../inference"
+    )
 
     args = parser.parse_args()
+    try:
+        args.fiducial = int(args.fiducial)
+    except:
+        args.fiducial = fidNametoNum[args.fiducial]
+        args.fiducial = int(args.fiducial)
 
     if args.gpu:
-        os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+        os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
     # check input files
-    if args.task == 'play':
-        error_message = """Wrong input files {} for {} task - should be 1 \'images.txt\' """.format(len(args.files), args.task)
+    if args.task == "play":
+        error_message = """Wrong input files {} for {} task - should be 1 \'images.txt\' """.format(
+            len(args.files), args.task
+        )
         assert len(args.files) == 1
     else:
-        error_message = """Wrong input files {} for {} task - should be 2 [\'images.txt\', \'landmarks.txt\'] """.format(len(args.files), args.task)
-        assert len(args.files) == 2, (error_message)
-
+        error_message = """Wrong input files {} for {} task - should be 2 [\'images.txt\', \'landmarks.txt\'] """.format(
+            len(args.files), args.task
+        )
+        assert len(args.files) == 2, error_message
 
     METHOD = args.algo
     # load files into env to set num_actions, num_validation_files
-    init_player = MedicalPlayer(files_list=args.files,
-                                screen_dims=IMAGE_SIZE,
-                                task='play', fiducial=args.fiducial)
+    init_player = MedicalPlayer(
+        files_list=args.files,
+        screen_dims=IMAGE_SIZE,
+        task="play",
+        fiducial=args.fiducial,
+        infDir=args.inferDir,
+    )
     NUM_ACTIONS = init_player.action_space.n
     num_files = init_player.files.num_files
 
-    if args.task != 'train':
+    if args.task != "train":
         assert args.load is not None
-        pred = OfflinePredictor(PredictConfig(
-            model=Model(),
-            session_init=get_model_loader(args.load),
-            input_names=['state'],
-            output_names=['Qvalue']))
+        pred = OfflinePredictor(
+            PredictConfig(
+                model=Model(),
+                session_init=get_model_loader(args.load),
+                input_names=["state"],
+                output_names=["Qvalue"],
+            )
+        )
         # demo pretrained model one episode at a time
-        if args.task == 'play':
-            play_n_episodes(get_player(files_list=args.files, viz=0.01,
-                                       saveGif=args.saveGif,
-                                       saveVideo=args.saveVideo,
-                                       task='play', fiducial=args.fiducial),
-                            pred, num_files, fidname=args.fidName)
+        if args.task == "play":
+            play_n_episodes(
+                get_player(
+                    files_list=args.files,
+                    viz=0,
+                    saveGif=args.saveGif,
+                    saveVideo=args.saveVideo,
+                    task="play",
+                    fiducial=args.fiducial,
+                    infDir=args.inferDir,
+                ),
+                pred,
+                num_files,
+                fidname=fidNumToName[args.fiducial],
+                infDir=args.inferDir,
+            )
         # run episodes in parallel and evaluate pretrained model
-        elif args.task == 'eval':
-            play_n_episodes(get_player(files_list=args.files, viz=0.01,
-                                       saveGif=args.saveGif,
-                                       saveVideo=args.saveVideo,
-                                       task='eval', fiducial=args.fiducial),
-                            pred, num_files, fidname=args.fidName)
+        elif args.task == "eval":
+            play_n_episodes(
+                get_player(
+                    files_list=args.files,
+                    viz=0,
+                    saveGif=args.saveGif,
+                    saveVideo=args.saveVideo,
+                    task="eval",
+                    fiducial=args.fiducial,
+                    infDir=args.inferDir,
+                ),
+                pred,
+                num_files,
+                fidname=fidNumToName[args.fiducial],
+                infDir=args.inferDir,
+            )
     else:  # train model
         logger_dir = os.path.join(args.logDir, args.name)
         logger.set_logger_dir(logger_dir)

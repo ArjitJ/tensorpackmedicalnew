@@ -10,8 +10,7 @@ from collections import defaultdict
 import six
 from tensorpack.utils.utils import get_rng
 
-__all__ = ['RLEnvironment', 'ProxyPlayer',
-           'DiscreteActionSpace']
+__all__ = ["RLEnvironment", "ProxyPlayer", "DiscreteActionSpace"]
 
 
 @six.add_metaclass(ABCMeta)
@@ -55,7 +54,7 @@ class RLEnvironment(object):
         """ Reset all statistics counter"""
         self.stats = defaultdict(list)
 
-    def play_one_episode(self, func, stat='score'):
+    def play_one_episode(self, func, stat="score"):
         """ Play one episode for eval.
 
         Args:
@@ -76,8 +75,8 @@ class RLEnvironment(object):
                 self.reset_stat()
                 return s if len(s) > 1 else s[0]
 
-class ActionSpace(object):
 
+class ActionSpace(object):
     def __init__(self):
         self.rng = get_rng(self)
 
@@ -90,7 +89,6 @@ class ActionSpace(object):
 
 
 class DiscreteActionSpace(ActionSpace):
-
     def __init__(self, num):
         super(DiscreteActionSpace, self).__init__()
         self.num = num

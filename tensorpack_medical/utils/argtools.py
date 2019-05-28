@@ -7,13 +7,13 @@
 import inspect
 import six
 from tensorpack import logger
+
 if six.PY2:
     import functools32 as functools
 else:
     import functools
 
-__all__ = ['shape3d', 'shape5d', 'get_data_format3d']
-
+__all__ = ["shape3d", "shape5d", "get_data_format3d"]
 
 
 def shape3d(a):
@@ -34,7 +34,7 @@ def shape3d(a):
     raise RuntimeError("Illegal shape: {}".format(a))
 
 
-def shape5d(a, data_format='NDHWC'):
+def shape5d(a, data_format="NDHWC"):
     """
     Ensuer a 5D shape, to use with 5D symbolic functions.
 
@@ -46,7 +46,7 @@ def shape5d(a, data_format='NDHWC'):
             or ``[1, 1, a, a, a]`` depending on data_format "NDHWC" or "NCDHW".
     """
     s2d = shape3d(a)
-    if data_format == 'NDHWC':
+    if data_format == "NDHWC":
         return [1] + s2d + [1]
     else:
         return [1, 1] + s2d
@@ -54,9 +54,9 @@ def shape5d(a, data_format='NDHWC'):
 
 def get_data_format3d(data_format, tfmode=True):
     if tfmode:
-        dic = {'NCDHW': 'channels_first', 'NDHWC': 'channels_last'}
+        dic = {"NCDHW": "channels_first", "NDHWC": "channels_last"}
     else:
-        dic = {'channels_first': 'NCDHW', 'channels_last': 'NDHWC'}
+        dic = {"channels_first": "NCDHW", "channels_last": "NDHWC"}
     ret = dic.get(data_format, data_format)
     if ret not in dic.values():
         raise ValueError("Unknown data_format: {}".format(data_format))

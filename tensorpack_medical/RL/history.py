@@ -9,7 +9,7 @@ from collections import deque
 from six.moves import range
 from tensorpack.RL.envbase import ProxyPlayer
 
-__all__ = ['HistoryFramePlayer']
+__all__ = ["HistoryFramePlayer"]
 
 
 class HistoryBuffer(object):

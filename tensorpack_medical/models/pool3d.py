@@ -13,14 +13,16 @@ from tensorpack_medical.utils.argtools import shape3d
 from tensorpack.models.shape_utils import StaticDynamicAxis
 
 
-
-__all__ = ['MaxPooling3D', 'AvgPooling3D', 'GlobalAvgPooling3D',
-           # 'FixedUnPooling', 'BilinearUpSample'
-           ]
+__all__ = [
+    "MaxPooling3D",
+    "AvgPooling3D",
+    "GlobalAvgPooling3D",
+    # 'FixedUnPooling', 'BilinearUpSample'
+]
 
 
 @layer_register(log_shape=True)
-def MaxPooling3D(x, shape, stride=None, padding='VALID', data_format='NDHWC'):
+def MaxPooling3D(x, shape, stride=None, padding="VALID", data_format="NDHWC"):
     """
     Max Pooling on 5D tensors.
 
@@ -35,13 +37,18 @@ def MaxPooling3D(x, shape, stride=None, padding='VALID', data_format='NDHWC'):
     """
     if stride is None:
         stride = shape
-    ret = tf.layers.max_pooling3d(x, shape, stride, padding,
-                                  'channels_last' if data_format == 'NDHWC' else 'channels_first')
-    return tf.identity(ret, name='output')
+    ret = tf.layers.max_pooling3d(
+        x,
+        shape,
+        stride,
+        padding,
+        "channels_last" if data_format == "NDHWC" else "channels_first",
+    )
+    return tf.identity(ret, name="output")
 
 
 @layer_register(log_shape=True)
-def AvgPooling3D(x, shape, stride=None, padding='VALID', data_format='NDHWC'):
+def AvgPooling3D(x, shape, stride=None, padding="VALID", data_format="NDHWC"):
     """
     Average Pooling on 5D tensors.
 
@@ -56,13 +63,18 @@ def AvgPooling3D(x, shape, stride=None, padding='VALID', data_format='NDHWC'):
     """
     if stride is None:
         stride = shape
-    ret = tf.layers.average_pooling3d(x, shape, stride, padding,
-                                      'channels_last' if data_format == 'NDHWC' else 'channels_first')
-    return tf.identity(ret, name='output')
+    ret = tf.layers.average_pooling3d(
+        x,
+        shape,
+        stride,
+        padding,
+        "channels_last" if data_format == "NDHWC" else "channels_first",
+    )
+    return tf.identity(ret, name="output")
 
 
 @layer_register(log_shape=True)
-def GlobalAvgPooling3D(x, data_format='NDHWC'):
+def GlobalAvgPooling3D(x, data_format="NDHWC"):
     """
     Global average pooling as in the paper `Network In Network
     <http://arxiv.org/abs/1312.4400>`_.
@@ -73,9 +85,9 @@ def GlobalAvgPooling3D(x, data_format='NDHWC'):
         tf.Tensor: an NC tensor named ``output``.
     """
     assert x.shape.ndims == 5
-    assert data_format in ['NDHWC', 'NCHDW']
-    axis = [1, 2, 3] if data_format == 'NDHWC' else [2, 3, 4]
-    return tf.reduce_mean(x, axis, name='output')
+    assert data_format in ["NDHWC", "NCHDW"]
+    axis = [1, 2, 3] if data_format == "NDHWC" else [2, 3, 4]
+    return tf.reduce_mean(x, axis, name="output")
 
 
 # def UnPooling2x2ZeroFilled(x):

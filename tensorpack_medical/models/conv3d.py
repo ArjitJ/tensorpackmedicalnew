@@ -14,29 +14,30 @@ from tensorpack_medical.utils.argtools import shape3d, shape5d, get_data_format3
 
 @layer_register(log_shape=True)
 @convert_to_tflayer_args(
-    args_names=['filters', 'kernel_size'],
+    args_names=["filters", "kernel_size"],
     name_mapping={
-        'out_channel': 'filters',
-        'kernel_shape': 'kernel_size',
-        'stride': 'strides',
-    })
-
+        "out_channel": "filters",
+        "kernel_shape": "kernel_size",
+        "stride": "strides",
+    },
+)
 def Conv3D(
-        inputs,
-        filters,
-        kernel_size,
-        strides=(1, 1, 1),
-        padding='same',
-        data_format='channels_last',
-        dilation_rate=(1, 1, 1),
-        activation=None,
-        use_bias=True,
-        kernel_initializer=tf.contrib.layers.variance_scaling_initializer(2.0),
-        bias_initializer=tf.zeros_initializer(),
-        kernel_regularizer=None,
-        bias_regularizer=None,
-        activity_regularizer=None,
-        split=1):
+    inputs,
+    filters,
+    kernel_size,
+    strides=(1, 1, 1),
+    padding="same",
+    data_format="channels_last",
+    dilation_rate=(1, 1, 1),
+    activation=None,
+    use_bias=True,
+    kernel_initializer=tf.contrib.layers.variance_scaling_initializer(2.0),
+    bias_initializer=tf.zeros_initializer(),
+    kernel_regularizer=None,
+    bias_regularizer=None,
+    activity_regularizer=None,
+    split=1,
+):
     """
     A wrapper around `tf.layers.Conv3D`.
     Some differences to maintain backward-compatibility:
@@ -48,13 +49,13 @@ def Conv3D(
     * ``b``: bias
     """
     if split == 1:
-        with rename_get_variable({'kernel': 'W', 'bias': 'b'}):
+        with rename_get_variable({"kernel": "W", "bias": "b"}):
             layer = tf.layers.Conv3D(
                 filters,
                 kernel_size,
                 strides=strides,
                 padding=padding,
-                data_format='channels_last',
+                data_format="channels_last",
                 dilation_rate=dilation_rate,
                 activation=activation,
                 use_bias=use_bias,
@@ -62,9 +63,10 @@ def Conv3D(
                 bias_initializer=bias_initializer,
                 kernel_regularizer=kernel_regularizer,
                 bias_regularizer=bias_regularizer,
-                activity_regularizer=activity_regularizer)
+                activity_regularizer=activity_regularizer,
+            )
             ret = layer.apply(inputs, scope=tf.get_variable_scope())
-            ret = tf.identity(ret, name='output')
+            ret = tf.identity(ret, name="output")
 
         ret.variables = VariableHolder(W=layer.kernel)
         if use_bias:
@@ -74,17 +76,22 @@ def Conv3D(
         # group conv implementation
         data_format = get_data_format3d(data_format, tfmode=False)
         in_shape = inputs.get_shape().as_list()
-        channel_axis = 4 if data_format == 'NDHWC' else 1
+        channel_axis = 4 if data_format == "NDHWC" else 1
         in_channel = in_shape[channel_axis]
         assert in_channel is not None, "[Conv3D] Input cannot have unknown channel!"
         assert in_channel % split == 0
 
-        assert kernel_regularizer is None and bias_regularizer is None and activity_regularizer is None, \
-            "Not supported by group conv now!"
+        assert (
+            kernel_regularizer is None
+            and bias_regularizer is None
+            and activity_regularizer is None
+        ), "Not supported by group conv now!"
 
         out_channel = filters
         assert out_channel % split == 0
-        assert dilation_rate == (1, 1, 1) or get_tf_version_number() >= 1.5, 'TF>=1.5 required for group dilated conv'
+        assert (
+            dilation_rate == (1, 1, 1) or get_tf_version_number() >= 1.5
+        ), "TF>=1.5 required for group dilated conv"
 
         kernel_shape = shape3d(kernel_size)
         filter_shape = kernel_shape + [in_channel / split, out_channel]
@@ -92,29 +99,34 @@ def Conv3D(
 
         kwargs = dict(data_format=data_format)
         if get_tf_version_number() >= 1.5:
-            kwargs['dilations'] = shape4d(dilation_rate, data_format=data_format)
+            kwargs["dilations"] = shape4d(dilation_rate, data_format=data_format)
 
-        W = tf.get_variable(
-            'W', filter_shape, initializer=kernel_initializer)
+        W = tf.get_variable("W", filter_shape, initializer=kernel_initializer)
 
         if use_bias:
-            b = tf.get_variable('b', [out_channel], initializer=bias_initializer)
+            b = tf.get_variable("b", [out_channel], initializer=bias_initializer)
 
         inputs = tf.split(inputs, split, channel_axis)
         # tf.split(value,num_or_size_splits,axis=0, num=None,name='split')
         kernels = tf.split(W, split, 4)
 
-        outputs = [tf.nn.conv3d(i, k, stride, padding.upper(), **kwargs)
-                   for i, k in zip(inputs, kernels)]
+        outputs = [
+            tf.nn.conv3d(i, k, stride, padding.upper(), **kwargs)
+            for i, k in zip(inputs, kernels)
+        ]
         conv = tf.concat(outputs, channel_axis)
         if activation is None:
             activation = tf.identity
-        ret = activation(tf.nn.bias_add(conv, b, data_format=data_format) if use_bias else conv, name='output')
+        ret = activation(
+            tf.nn.bias_add(conv, b, data_format=data_format) if use_bias else conv,
+            name="output",
+        )
 
         ret.variables = VariableHolder(W=W)
         if use_bias:
             ret.variables.b = b
     return ret
+
 
 # @layer_register(log_shape=True)
 # def Conv3D(x, out_channel, kernel_shape,
@@ -193,11 +205,18 @@ def Conv3D(
 
 
 @layer_register(log_shape=True)
-def Deconv3D(x, out_shape, kernel_shape,
-             stride, padding='SAME',
-             W_init=None, b_init=None,
-             nl=tf.identity, use_bias=True,
-             data_format='NDHWC'):
+def Deconv3D(
+    x,
+    out_shape,
+    kernel_shape,
+    stride,
+    padding="SAME",
+    W_init=None,
+    b_init=None,
+    nl=tf.identity,
+    use_bias=True,
+    data_format="NDHWC",
+):
     """
     3D deconvolution on 5D inputs.
 
@@ -223,7 +242,7 @@ def Deconv3D(x, out_shape, kernel_shape,
     * ``b``: bias
     """
     in_shape = x.get_shape().as_list()
-    channel_axis = 4 if data_format == 'NDHWC' else 1
+    channel_axis = 4 if data_format == "NDHWC" else 1
     in_channel = in_shape[channel_axis]
     assert in_channel is not None, "[Deconv3D] Input cannot have unknown channel!"
     kernel_shape = shape3d(kernel_shape)
@@ -234,39 +253,57 @@ def Deconv3D(x, out_shape, kernel_shape,
 
     if isinstance(out_shape, int):
         out_channel = out_shape
-        if data_format == 'NDHWC':
-            shp3_0 = StaticDynamicAxis(in_shape[1], in_shape_dyn[1]).apply(lambda x: stride3d[0] * x)
-            shp3_1 = StaticDynamicAxis(in_shape[2], in_shape_dyn[2]).apply(lambda x: stride3d[1] * x)
-            shp3_2 = StaticDynamicAxis(in_shape[3], in_shape_dyn[3]).apply(lambda x: stride3d[2] * x)
+        if data_format == "NDHWC":
+            shp3_0 = StaticDynamicAxis(in_shape[1], in_shape_dyn[1]).apply(
+                lambda x: stride3d[0] * x
+            )
+            shp3_1 = StaticDynamicAxis(in_shape[2], in_shape_dyn[2]).apply(
+                lambda x: stride3d[1] * x
+            )
+            shp3_2 = StaticDynamicAxis(in_shape[3], in_shape_dyn[3]).apply(
+                lambda x: stride3d[2] * x
+            )
             shp3_dyn = [shp3_0.dynamic, shp3_1.dynamic, shp3_2.dynamic, out_channel]
             shp3_static = [shp3_0.static, shp3_1.static, shp3_2.static, out_channel]
         else:
-            shp3_0 = StaticDynamicAxis(in_shape[2], in_shape_dyn[2]).apply(lambda x: stride3d[0] * x)
-            shp3_1 = StaticDynamicAxis(in_shape[3], in_shape_dyn[3]).apply(lambda x: stride3d[1] * x)
-            shp3_2 = StaticDynamicAxis(in_shape[4], in_shape_dyn[4]).apply(lambda x: stride3d[2] * x)
+            shp3_0 = StaticDynamicAxis(in_shape[2], in_shape_dyn[2]).apply(
+                lambda x: stride3d[0] * x
+            )
+            shp3_1 = StaticDynamicAxis(in_shape[3], in_shape_dyn[3]).apply(
+                lambda x: stride3d[1] * x
+            )
+            shp3_2 = StaticDynamicAxis(in_shape[4], in_shape_dyn[4]).apply(
+                lambda x: stride3d[2] * x
+            )
             shp3_dyn = [out_channel, shp3_0.dynamic, shp3_1.dynamic, shp3_2.dynamic]
             shp3_static = [out_channel, shp3_0.static, shp3_1.static, shp3_2.static]
     else:
         for k in out_shape:
             if not isinstance(k, int):
                 raise ValueError("[Deconv3D] out_shape {} is invalid!".format(k))
-        out_channel = out_shape[channel_axis - 1] # out_shape doesn't have batch
+        out_channel = out_shape[channel_axis - 1]  # out_shape doesn't have batch
         shp3_static = shp3_dyn = out_shape
     filter_shape = kernel_shape + [out_channel, in_channel]
 
     if W_init is None:
-        W_init = tf.contrib.layers.variance_scaling_initializer() # xavier_initializer_conv2d()
+        W_init = (
+            tf.contrib.layers.variance_scaling_initializer()
+        )  # xavier_initializer_conv2d()
     if b_init is None:
         b_init = tf.constant_initializer()
-    W = tf.get_variable('W', filter_shape, initializer=W_init)
+    W = tf.get_variable("W", filter_shape, initializer=W_init)
     if use_bias:
-        b = tf.get_variable('b', [out_channel], initializer=b_init)
+        b = tf.get_variable("b", [out_channel], initializer=b_init)
 
     out_shape_dyn = tf.stack([tf.shape(x)[0]] + shp3_dyn)
     conv = tf.nn.conv3d_transpose(
-        x, W, out_shape_dyn, stride5d, padding=padding, data_format=data_format)
+        x, W, out_shape_dyn, stride5d, padding=padding, data_format=data_format
+    )
     conv.set_shape(tf.TensorShape([None] + shp3_static))
-    ret = nl(tf.nn.bias_add(conv, b, data_format='NDHWC') if use_bias else conv, name='output')
+    ret = nl(
+        tf.nn.bias_add(conv, b, data_format="NDHWC") if use_bias else conv,
+        name="output",
+    )
 
     ret.variables = VariableHolder(W=W)
     if use_bias:
