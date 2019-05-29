@@ -135,13 +135,13 @@ class filesListBrainMRLandmark(object):
                             landmark
                         )
                     landmark = np.round(landmark).astype("int")
-                    if self.eval:
-                        sitk.WriteImage(
-                            sitk_image, self.infDir + "/" + os.path.basename(image.name)
-                        )
                 else:
                     landmark = None
                 # extract filename from path
+                if self.eval:
+                    sitk.WriteImage(
+                        sitk_image, self.infDir + "/" + os.path.basename(image.name)
+                    )
                 image_filename = self.image_files[idx]
                 yield image, landmark, image_filename, sitk_image.GetSpacing()
 

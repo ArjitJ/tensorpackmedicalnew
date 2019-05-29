@@ -97,19 +97,19 @@ def play_n_episodes(
         physical = img.TransformContinuousIndexToPhysicalPoint(
             (location[0], location[1], location[2])
         )
-        fcsv = open(infDir + "/" + os.path.basename(filename[:-10] + "lmks.fcsv"), "w")
+        # fcsv = open(infDir + "/" + os.path.basename(filename[:-10] + "lmks.fcsv"), "w")
         fcsv_new = open(
             infDir + "/" + os.path.basename(filename[:-10] + "lmks_new.fcsv"), "w"
         )
-        fcsv.write(
-            "{},{},{},{},1,1\n".format(fidname, -physical[0], -physical[1], physical[2])
-        )
+        # fcsv.write(
+        #     "{},{},{},{},1,1\n".format(fidname, -physical[0], -physical[1], physical[2])
+        # )
         fcsv_new.write(
-            "vtkMRMLMarkupsFiducialNode_0, {}, {}, {}, 0, 0, 0, 1, 1, 1, 0, {}, ,\n".format(
+            "vtkMRMLMarkupsFiducialNode_0,{},{},{},0,0,0,1,1,1,0,{},,\n".format(
                 -physical[0], -physical[1], physical[2], fidname
             )
         )
-        fcsv.close()
+        # fcsv.close()
         fcsv_new.close()
     # file.close()
 

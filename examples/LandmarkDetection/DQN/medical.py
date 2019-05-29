@@ -168,7 +168,8 @@ class MedicalPlayer(gym.Env):
         # add your data loader here
         if self.task == "play":
             self.files = filesListBrainMRLandmark(
-                files_list, returnLandmarks=False, fiducial=fiducial, infDir=infDir
+                files_list, returnLandmarks=False, fiducial=fiducial, infDir=infDir,
+                eval=True,
             )
         else:
             if self.task == "eval":
