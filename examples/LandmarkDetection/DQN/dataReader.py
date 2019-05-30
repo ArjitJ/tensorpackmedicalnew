@@ -30,6 +30,7 @@ def getLandmarksFromTXTFile(file):
         landmarks = np.asarray(landmarks).reshape((-1, 3))
         return landmarks
 
+indices = ['AC', 'BPons', 'CM', 'LE', 'PC', 'RE', 'RP', 'RP_front', 'SMV', 'VN4', 'callosum_left', 'callosum_right', 'dens_axis', 'genu', 'l_caud_head', 'l_corp', 'l_front_pole', 'l_inner_corpus', 'l_lat_ext', 'l_occ_pole', 'l_prim_ext', 'l_sup_ext', 'l_temp_pole', 'lat_left', 'lat_right', 'lat_ven_left', 'lat_ven_right', 'left_cereb', 'left_lateral_inner_ear', 'm_ax_inf', 'm_ax_sup', 'mid_basel', 'mid_lat', 'mid_prim_inf', 'mid_prim_sup', 'mid_sup', 'optic_chiasm', 'r_caud_head', 'r_corp', 'r_front_pole', 'r_inner_corpus', 'r_lat_ext', 'r_occ_pole', 'r_prim_ext', 'r_sup_ext', 'r_temp_pole', 'right_lateral_inner_ear', 'rostrum', 'rostrum_front', 'top_left', 'top_right']
 
 def getLandmarksFromFCSVFile(file):
     df = pd.read_csv(file, header=None, comment="#")
@@ -55,6 +56,8 @@ def getLandmarksFromFCSVFile(file):
         ]
     else:
         raise "Please check your input FCSV file"
+    df.index = df["label"]
+    df = df.reindex(labels=indices)
     # the sign flipping in x and y is to convert RAS(used by slicer) to LPS(used in DICOM and itk)
     xcoord = -1 * df["x"].values.reshape(-1, 1)
     ycoord = -1 * df["y"].values.reshape(-1, 1)
